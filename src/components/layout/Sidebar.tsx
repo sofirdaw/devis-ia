@@ -1,0 +1,233 @@
+/**
+ * Composant Sidebar — Navigation latérale de l'application
+ * 
+ * Affiche :
+ * - Logo de l'app
+ * - Menu de navigation principal
+ * - Nom de l'entreprise connectée
+ * - Bouton de déconnexion
+ */
+
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth.store";
+import { useClerk } from "@clerk/nextjs";
+import { useState } from "react";
+import {
+  LayoutDashboard,
+  Users,
+  Package,
+  FileText,
+  Receipt,
+  Settings,
+  LogOut,
+  Sparkles,
+  Building2,
+  DollarSign,
+  Factory,
+  Menu,
+  X,
+} from "lucide-react";
+
+// Définition des items de navigation
+const NAV_ITEMS: {
+  label: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+  highlight?: boolean;
+}[] = [
+  {
+    label: "Tableau de bord",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    label: "Devis IA",
+    href: "/quotes",
+    icon: Sparkles,
+   /* highlight: true,*/
+  },
+  {
+    label: "Factures",
+    href: "/invoices",
+    icon: Receipt,
+  },
+  {
+    label: "Créances",
+    href: "/receivables",
+    icon: DollarSign,
+  },
+  {
+    label: "Clients",
+    href: "/clients",
+    icon: Users,
+  },
+  {
+    label: "Produits",
+    href: "/products",
+    icon: Package,
+  },
+  {
+    label: "Fournisseurs",
+    href: "/suppliers",
+    icon: Factory,
+  },
+];
+
+const BOTTOM_ITEMS = [
+  {
+    label: "Paramètres",
+    href: "/settings",
+    icon: Settings,
+  },
+];
+
+export function Sidebar() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { company, reset } = useAuthStore();
+  const { signOut } = useClerk();
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Déconnexion via Clerk
+  const handleLogout = async () => {
+    reset();
+    await signOut();
+    router.push("/sign-in");
+  };
+
+  // Fermer le menu mobile lors de la navigation
+  const handleLinkClick = () => {
+    setIsOpen(false);
+  };
+
+  return (
+    <>
+      {/* Mobile menu button */}
+      <button
+        onClick={() => setIsOpen(true)}
+        className="lg:hidden fixed top-4 right-20 z-50 p-2 bg-gray-900 text-white rounded-lg shadow-lg hover:bg-gray-800 transition-colors"
+        aria-label="Ouvrir le menu"
+      >
+        <Menu size={24} />
+      </button>
+
+      {/* Overlay pour mobile */}
+      {isOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-30"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed left-0 top-0 h-screen bg-gray-900 flex flex-col shrink-0 transition-transform duration-300 ease-in-out",
+          "w-60",
+          isOpen ? "translate-x-0 z-40" : "-translate-x-full z-40",
+          "lg:translate-x-0 lg:z-20"
+        )}
+      >
+        {/* Logo + Close button mobile */}
+        <div className="px-4 py-5 border-b border-gray-800 flex items-center justify-between">
+          <Link href="/dashboard" className="flex items-center gap-2.5" onClick={handleLinkClick}>
+            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+              <FileText size={16} className="text-white" />
+            </div>
+            <span className="font-semibold text-white text-sm">
+              Devis<span className="text-primary-400">IA</span>
+            </span>
+          </Link>
+          <button
+            onClick={() => setIsOpen(false)}
+            className="lg:hidden p-1 text-gray-400 hover:text-white"
+            aria-label="Fermer le menu"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Navigation principale */}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            // Un item est actif si le pathname commence par son href
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={handleLinkClick}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary-600 text-white"
+                    : item.highlight
+                    ? "text-primary-400 hover:bg-gray-800 hover:text-primary-300"
+                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                )}
+              >
+                <Icon size={18} />
+                {item.label}
+                {/* Badge "IA" pour les features IA */}
+                {item.highlight && !isActive && (
+                  <span className="ml-auto text-[10px] bg-primary-600/30 text-primary-400 px-1.5 py-0.5 rounded-full">
+                    IA
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Section bas — Entreprise + Settings + Logout */}
+        <div className="border-t border-gray-800 px-3 py-3 space-y-1">
+          {BOTTOM_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={handleLinkClick}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary-600 text-white"
+                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                )}
+              >
+                <Icon size={18} />
+                {item.label}
+              </Link>
+            );
+          })}
+
+          {/* Nom de l'entreprise */}
+          {company && (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <Building2 size={16} className="text-gray-600 shrink-0" />
+              <span className="text-xs text-gray-500 truncate">{company.name}</span>
+            </div>
+          )}
+
+          {/* Bouton déconnexion */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-red-400 transition-colors"
+          >
+            <LogOut size={18} />
+            Déconnexion
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
