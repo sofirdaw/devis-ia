@@ -43,7 +43,7 @@ export default async function QuoteDetailPage({
         title={typedQuote.quote_number}
         description={`Devis pour ${typedQuote.client?.name}`}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Link href="/quotes">
               <Button
                 variant="ghost"

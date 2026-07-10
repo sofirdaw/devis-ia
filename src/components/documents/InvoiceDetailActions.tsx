@@ -32,7 +32,7 @@ export function InvoiceDetailActions({ invoiceId, currentStatus }: InvoiceDetail
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         {currentStatus === "draft" && (
           <Link href={`/invoices/${invoiceId}/edit`}>
             <Button variant="outline" size="sm" leftIcon={<Pencil size={14} />}>

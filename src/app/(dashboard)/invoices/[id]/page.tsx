@@ -48,7 +48,7 @@ export default async function InvoiceDetailPage({
         title={typedInvoice.invoice_number}
         description={`Facture pour ${typedInvoice.client?.name}`}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Link href="/invoices">
               <Button
                 variant="ghost"

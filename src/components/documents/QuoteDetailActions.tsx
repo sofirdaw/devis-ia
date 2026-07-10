@@ -46,7 +46,7 @@ export function QuoteDetailActions({ quoteId, currentStatus }: QuoteDetailAction
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         {/* Bouton Modifier (brouillons uniquement) */}
         {currentStatus === "draft" && (
           <Link href={`/quotes/${quoteId}/edit`}>
