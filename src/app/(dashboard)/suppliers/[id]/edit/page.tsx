@@ -8,6 +8,9 @@ import { requireCurrentCompany } from "@/lib/current-company";
 import { Header } from "@/components/layout";
 import { SupplierForm } from "@/components/documents/SupplierForm";
 import type { Supplier } from "@/types";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default async function EditSupplierPage({
   params,
@@ -32,6 +35,18 @@ export default async function EditSupplierPage({
       <Header
         title={`Modifier ${supplier.name}`}
         description="Modifiez les informations du fournisseur"
+        actions={
+          <Link href={`/suppliers/${id}`}>
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<ArrowLeft size={14} />}
+              className="flex sm:hidden"
+            >
+              Retour
+            </Button>
+          </Link>
+        }
       />
       <div className="page-container max-w-2xl">
         <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 lg:p-8">

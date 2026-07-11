@@ -7,6 +7,9 @@ import { requireCurrentCompany } from "@/lib/current-company";
 import { Header } from "@/components/layout";
 import { QuotesTable } from "@/components/documents/QuotesTable";
 import type { Quote } from "@/types";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default async function QuotesPage() {
   const company = await requireCurrentCompany();
@@ -21,9 +24,23 @@ export default async function QuotesPage() {
 
   return (
     <>
-      <Header
+      <Header 
         title="Devis"
-        description="Gérez vos devis et suivez leur statut"
+        description="Gérez vos devis et suivez leur statut" 
+       
+        actions={
+          <Link href="/dashboard">
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<ArrowLeft size={14} />}
+              className="flex sm:hidde"
+             
+            >
+              Retour
+            </Button>
+          </Link>
+        } 
       />
       <div className="page-container">
         <QuotesTable quotes={(quotes as Quote[]) ?? []} />

@@ -8,7 +8,7 @@ import { Header } from "@/components/layout";
 import { SuppliersTable } from "@/components/documents/SuppliersTable";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, ArrowLeft } from "lucide-react";
 import type { Supplier } from "@/types";
 
 export default async function SuppliersPage() {
@@ -26,6 +26,18 @@ export default async function SuppliersPage() {
       <Header
         title="Fournisseurs"
         description="Gérez vos fournisseurs et leurs informations de contact"
+        actions={
+          <Link href="/dashboard">
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<ArrowLeft size={14} />}
+              className="flex sm:hidden"
+            >
+              Retour
+            </Button>
+          </Link>
+        }
       />
       <div className="page-container max-w-6xl">
         <div className="flex justify-end mb-6">

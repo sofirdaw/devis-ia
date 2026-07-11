@@ -39,6 +39,7 @@ export default async function NewInvoicePage() {
               variant="ghost"
               size="sm"
               leftIcon={<ArrowLeft size={14} />}
+              className="flex sm:hidden"
             >
               Retour
             </Button>

@@ -49,6 +49,7 @@ export default async function QuoteDetailPage({
                 variant="ghost"
                 size="sm"
                 leftIcon={<ArrowLeft size={14} />}
+                className="flex sm:hidden"
               >
                 Retour
               </Button>

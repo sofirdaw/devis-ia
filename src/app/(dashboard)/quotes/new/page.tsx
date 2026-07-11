@@ -41,6 +41,7 @@ export default async function NewQuotePage() {
               variant="ghost"
               size="sm"
               leftIcon={<ArrowLeft size={14} />}
+              className="flex sm:hidden"
             >
               Retour
             </Button>

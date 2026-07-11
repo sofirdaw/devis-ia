@@ -10,6 +10,9 @@ import { requireCurrentCompany } from "@/lib/current-company";
 import { Header } from "@/components/layout";
 import { ReceivablesTable } from "@/components/receivables/ReceivablesTable";
 import type { Receivable } from "@/types";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default async function ReceivablesPage() {
   const company = await requireCurrentCompany();
@@ -27,6 +30,18 @@ export default async function ReceivablesPage() {
       <Header
         title="Créances"
         description={`${receivables?.length ?? 0} créance${(receivables?.length ?? 0) > 1 ? "s" : ""} enregistrée${(receivables?.length ?? 0) > 1 ? "s" : ""}`}
+        actions={
+          <Link href="/dashboard">
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<ArrowLeft size={14} />}
+              className="flex sm:hidden"
+            >
+              Retour
+            </Button>
+          </Link>
+        }
       />
       <div className="page-container">
         <ReceivablesTable

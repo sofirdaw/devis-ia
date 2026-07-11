@@ -56,6 +56,7 @@ export default async function EditInvoicePage({
               variant="ghost"
               size="sm"
               leftIcon={<ArrowLeft size={14} />}
+              className="flex sm:hidden"
             >
               Retour
             </Button>
