@@ -26,10 +26,10 @@ export function ImageUploadZone({
   const processFile = (file: File) => {
     if (!file.type.startsWith("image/")) return;
 
-    // Limiter la taille de l'image à 2 Mo pour éviter les erreurs API
-    const maxSize = 2 * 1024 * 1024; // 2 Mo
+    // Limiter la taille de l'image à 5 Mo pour éviter les erreurs API
+    const maxSize = 5 * 1024 * 1024; // 5 Mo
     if (file.size > maxSize) {
-      alert("L'image est trop grande. Veuillez utiliser une image de moins de 2 Mo.");
+      alert("L'image est trop grande. Veuillez utiliser une image de moins de 5 Mo.");
       return;
     }
 
@@ -95,7 +95,6 @@ export function ImageUploadZone({
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture
         className="hidden"
         disabled={disabled}
         onChange={(e) => {
