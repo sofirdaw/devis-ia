@@ -7,8 +7,8 @@
 
 "use client";
 
-import { useActionState } from "react";
-import { Building2 } from "lucide-react";
+import { useActionState, useState, useRef } from "react";
+import { Building2, Upload, X } from "lucide-react";
 import { createCompanyAction } from "@/app/actions/company";
 import type { ActionResult } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,21 @@ const initialState: ActionResult = {};
 
 export default function SetupPage() {
   const [state, formAction, isPending] = useActionState(createCompanyAction, initialState);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const preview = URL.createObjectURL(file);
+    setLogoPreview(preview);
+  };
+
+  const clearLogo = () => {
+    setLogoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center p-4">
@@ -44,6 +59,56 @@ export default function SetupPage() {
           )}
 
           <form action={formAction} className="space-y-4">
+            {/* Upload du logo */}
+            <div className="flex flex-col items-center gap-4 pb-6 border-b border-gray-100 mb-6">
+              <div className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden relative">
+                {logoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoPreview}
+                    alt="Logo de l'entreprise"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <Building2 size={32} className="text-gray-300" />
+                )}
+                {logoPreview && (
+                  <button
+                    type="button"
+                    onClick={clearLogo}
+                    className="absolute top-1 right-1 bg-white/90 hover:bg-white p-1.5 rounded-full shadow-sm transition-colors"
+                    aria-label="Supprimer le logo"
+                  >
+                    <X size={14} className="text-gray-700" />
+                  </button>
+                )}
+              </div>
+              <div className="text-center">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  name="logo"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleLogoChange}
+                  disabled={isPending}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Upload size={14} />}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isPending}
+                >
+                  {logoPreview ? "Changer le logo" : "Ajouter un logo"}
+                </Button>
+                <p className="text-xs text-gray-400 mt-2">
+                  PNG ou JPG, 2 Mo maximum (optionnel)
+                </p>
+              </div>
+            </div>
+
             <Input
               name="name"
               label="Nom de l'entreprise"

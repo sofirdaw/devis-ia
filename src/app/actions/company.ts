@@ -69,24 +69,67 @@ export async function createCompanyAction(
     redirect("/dashboard");
   }
 
-  const { error } = await supabase.from("companies").insert({
-    user_id: userId,
-    name: parsed.data.name,
-    phone: parsed.data.phone || null,
-    email: parsed.data.email || null,
-    address: parsed.data.address || null,
-    rccm: parsed.data.rccm || null,
-    ifu: parsed.data.ifu || null,
-    cme: parsed.data.cme || null,
-    default_quote_notes: parsed.data.default_quote_notes || null,
-    default_invoice_notes: parsed.data.default_invoice_notes || null,
-  });
+  const { data: company, error: insertError } = await supabase
+    .from("companies")
+    .insert({
+      user_id: userId,
+      name: parsed.data.name,
+      phone: parsed.data.phone || null,
+      email: parsed.data.email || null,
+      address: parsed.data.address || null,
+      rccm: parsed.data.rccm || null,
+      ifu: parsed.data.ifu || null,
+      cme: parsed.data.cme || null,
+      default_quote_notes: parsed.data.default_quote_notes || null,
+      default_invoice_notes: parsed.data.default_invoice_notes || null,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    console.error("Erreur création entreprise:", error);
+  if (insertError) {
+    console.error("Erreur création entreprise:", insertError);
     return {
-      error: `Erreur lors de la création de l'entreprise: ${error.message}`,
+      error: `Erreur lors de la création de l'entreprise: ${insertError.message}`,
     };
+  }
+
+  // Upload du logo si un fichier est fourni
+  const logoFile = formData.get("logo") as File | null;
+  if (logoFile && logoFile.size > 0) {
+    if (!logoFile.type.startsWith("image/")) {
+      return { error: "Le fichier doit être une image" };
+    }
+
+    if (logoFile.size > 2 * 1024 * 1024) {
+      return { error: "L'image doit faire moins de 2 Mo" };
+    }
+
+    const extension = logoFile.name.split(".").pop();
+    const path = `${company.id}/logo.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("logos")
+      .upload(path, logoFile, { upsert: true });
+
+    if (uploadError) {
+      console.error("Erreur upload logo:", uploadError);
+      return { error: `Erreur lors de l'upload du logo: ${uploadError.message}` };
+    }
+
+    // Récupérer l'URL publique
+    const { data: urlData } = supabase.storage.from("logos").getPublicUrl(path);
+    const logoUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+    // Mettre à jour l'entreprise avec l'URL du logo
+    const { error: updateError } = await supabase
+      .from("companies")
+      .update({ logo_url: logoUrl })
+      .eq("id", company.id);
+
+    if (updateError) {
+      console.error("Erreur update logo_url:", updateError);
+      return { error: "Erreur lors de l'enregistrement du logo" };
+    }
   }
 
   redirect("/dashboard");

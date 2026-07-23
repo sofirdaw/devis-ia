@@ -206,6 +206,28 @@ ${description}
 export async function generateDocumentFromImage(
   imageBase64: string,
 ): Promise<AIExtractionResult> {
+  // Vérifier que la clé API OpenAI est configurée pour la vision
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("OPENAI_API_KEY non configurée");
+    return {
+      success: false,
+      error: "La fonctionnalité d'analyse d'image nécessite une clé API OpenAI. Veuillez configurer OPENAI_API_KEY dans les variables d'environnement.",
+    };
+  }
+
+  console.log("OPENAI_API_KEY configurée, longueur:", process.env.OPENAI_API_KEY.length);
+
+  // Vérifier que l'image est en base64 valide
+  if (!imageBase64 || !imageBase64.startsWith("data:image/")) {
+    console.error("Format d'image invalide:", imageBase64?.substring(0, 50));
+    return {
+      success: false,
+      error: "Format d'image invalide",
+    };
+  }
+
+  console.log("Taille de l'image en base64:", imageBase64.length, "caractères");
+
   const context = await getContextForAI();
   if (!context) {
     return {
@@ -218,6 +240,9 @@ export async function generateDocumentFromImage(
     SYSTEM_PROMPT_BASE + buildCatalogContext(context.products as Product[]);
 
   try {
+    console.log("Début de l'analyse d'image avec GPT Vision...");
+    console.log("Modèle utilisé:", AI_VISION_MODEL);
+    
     const completion = await openaiVision.chat.completions.create({
       model: AI_VISION_MODEL,
       messages: [
@@ -249,12 +274,17 @@ Réponds UNIQUEMENT avec ce format JSON exact, sans aucun texte autour :
       ],
       response_format: { type: "json_object" },
       temperature: 0.1,
+      max_tokens: 1000,
     });
+
+    console.log("Réponse reçue de GPT Vision");
 
     const rawContent = completion.choices[0]?.message?.content;
     if (!rawContent) {
       return { success: false, error: "L'IA n'a pas pu analyser cette image" };
     }
+
+    console.log("Contenu brut:", rawContent.substring(0, 200));
 
     const parsed = JSON.parse(rawContent) as {
       client_name: string;
@@ -270,6 +300,8 @@ Réponds UNIQUEMENT avec ce format JSON exact, sans aucun texte autour :
     if (!parsed.items || parsed.items.length === 0) {
       return { success: false, error: "Aucun article détecté sur cette image" };
     }
+
+    console.log("Articles extraits:", parsed.items.length);
 
     const matchedClient = parsed.client_name
       ? context.clients.find(
@@ -292,6 +324,8 @@ Réponds UNIQUEMENT avec ce format JSON exact, sans aucun texte autour :
       };
     });
 
+    console.log("Extraction réussie, client:", parsed.client_name, "articles:", items.length);
+
     return {
       success: true,
       data: {
@@ -303,10 +337,12 @@ Réponds UNIQUEMENT avec ce format JSON exact, sans aucun texte autour :
       },
     };
   } catch (err) {
-    console.error("Erreur OCR IA :", err);
+    console.error("Erreur OCR IA détaillée :", err);
+    const errorMessage = err instanceof Error ? err.message : "Erreur inconnue";
+    console.error("Message d'erreur:", errorMessage);
     return {
       success: false,
-      error: "Erreur lors de l'analyse de l'image. Réessayez.",
+      error: `Erreur lors de l'analyse de l'image: ${errorMessage}. Réessayez avec une image plus claire ou utilisez le mode texte.`,
     };
   }
 }
