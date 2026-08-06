@@ -56,16 +56,40 @@ function getApiKeys(envVarName: string): string[] {
 function getVisionTargets(): ProviderTarget[] {
   const targets: ProviderTarget[] = [];
 
-  // 1. Google Gemini (Gratuit - 15 req/min, 1500 req/jour via GEMINI_API_KEY)
-  const geminiKeys = getApiKeys("GEMINI_API_KEY").concat(getApiKeys("GOOGLE_GENERATIVE_AI_API_KEY"));
-  geminiKeys.forEach((key, idx) => {
+  // 1. OpenRouter Vision (Modèle Gemini 2.5 Flash très performant & économique)
+  const openRouterKeys = getApiKeys("OPENROUTER_API_KEY");
+  openRouterKeys.forEach((key, idx) => {
     targets.push({
-      name: `Google Gemini Flash (Clé ${idx + 1})`,
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      name: `OpenRouter Gemini 2.5 Flash (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
       apiKey: key,
-      model: "gemini-1.5-flash",
+      model: "google/gemini-2.5-flash",
       isVision: true,
     });
+  });
+
+  // 2. Mistral AI Pixtral & Small (Ultra-fiable pour OCR)
+  const mistralKeys = getApiKeys("MISTRAL_API_KEY");
+  mistralKeys.forEach((key, idx) => {
+    targets.push({
+      name: `Mistral Pixtral 12B Vision (Clé ${idx + 1})`,
+      baseURL: "https://api.mistral.ai/v1",
+      apiKey: key,
+      model: "pixtral-12b-2409",
+      isVision: true,
+    });
+    targets.push({
+      name: `Mistral Small Vision (Clé ${idx + 1})`,
+      baseURL: "https://api.mistral.ai/v1",
+      apiKey: key,
+      model: "mistral-small-latest",
+      isVision: true,
+    });
+  });
+
+  // 3. Google Gemini Direct (via GEMINI_API_KEY)
+  const geminiKeys = getApiKeys("GEMINI_API_KEY").concat(getApiKeys("GOOGLE_GENERATIVE_AI_API_KEY"));
+  geminiKeys.forEach((key, idx) => {
     targets.push({
       name: `Google Gemini 2.0 Flash (Clé ${idx + 1})`,
       baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -73,52 +97,16 @@ function getVisionTargets(): ProviderTarget[] {
       model: "gemini-2.0-flash",
       isVision: true,
     });
-  });
-
-  // 2. Groq Vision (Gratuit via GROQ_API_KEY)
-  const groqKeys = getApiKeys("GROQ_API_KEY");
-  groqKeys.forEach((key, idx) => {
     targets.push({
-      name: `Groq Llama 3.2 Vision (Clé ${idx + 1})`,
-      baseURL: "https://api.groq.com/openai/v1",
+      name: `Google Gemini 1.5 Flash (Clé ${idx + 1})`,
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
       apiKey: key,
-      model: "llama-3.2-11b-vision-preview",
+      model: "gemini-1.5-flash",
       isVision: true,
     });
   });
 
-  // 3. OpenRouter Free Vision (Gratuit via OPENROUTER_API_KEY)
-  const openRouterKeys = getApiKeys("OPENROUTER_API_KEY");
-  openRouterKeys.forEach((key, idx) => {
-    targets.push({
-      name: `OpenRouter Gemini Free (Clé ${idx + 1})`,
-      baseURL: "https://openrouter.ai/api/v1",
-      apiKey: key,
-      model: "google/gemini-2.0-flash-exp:free",
-      isVision: true,
-    });
-    targets.push({
-      name: `OpenRouter Llama Vision Free (Clé ${idx + 1})`,
-      baseURL: "https://openrouter.ai/api/v1",
-      apiKey: key,
-      model: "meta-llama/llama-3.2-11b-vision-instruct:free",
-      isVision: true,
-    });
-  });
-
-  // 4. Mistral AI Pixtral (Gratuit / Essai via MISTRAL_API_KEY)
-  const mistralKeys = getApiKeys("MISTRAL_API_KEY");
-  mistralKeys.forEach((key, idx) => {
-    targets.push({
-      name: `Mistral Pixtral Vision (Clé ${idx + 1})`,
-      baseURL: "https://api.mistral.ai/v1",
-      apiKey: key,
-      model: "pixtral-12b-2409",
-      isVision: true,
-    });
-  });
-
-  // 5. OpenAI Vision (Fallback payant via OPENAI_API_KEY)
+  // 4. OpenAI Vision (Fallback payant via OPENAI_API_KEY)
   const openAiKeys = getApiKeys("OPENAI_API_KEY");
   openAiKeys.forEach((key, idx) => {
     targets.push({
@@ -148,33 +136,16 @@ function getTextTargets(): ProviderTarget[] {
       model: "llama-3.3-70b-versatile",
       isVision: false,
     });
-  });
-
-  // 2. Google Gemini (Gratuit)
-  const geminiKeys = getApiKeys("GEMINI_API_KEY").concat(getApiKeys("GOOGLE_GENERATIVE_AI_API_KEY"));
-  geminiKeys.forEach((key, idx) => {
     targets.push({
-      name: `Google Gemini 1.5 Flash (Clé ${idx + 1})`,
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      name: `Groq Llama 3.1 8B (Clé ${idx + 1})`,
+      baseURL: "https://api.groq.com/openai/v1",
       apiKey: key,
-      model: "gemini-1.5-flash",
+      model: "llama-3.1-8b-instant",
       isVision: false,
     });
   });
 
-  // 3. OpenRouter Free
-  const openRouterKeys = getApiKeys("OPENROUTER_API_KEY");
-  openRouterKeys.forEach((key, idx) => {
-    targets.push({
-      name: `OpenRouter Llama 3.3 Free (Clé ${idx + 1})`,
-      baseURL: "https://openrouter.ai/api/v1",
-      apiKey: key,
-      model: "meta-llama/llama-3.3-70b-instruct:free",
-      isVision: false,
-    });
-  });
-
-  // 4. Mistral AI
+  // 2. Mistral AI (Ultra-stable)
   const mistralKeys = getApiKeys("MISTRAL_API_KEY");
   mistralKeys.forEach((key, idx) => {
     targets.push({
@@ -182,6 +153,30 @@ function getTextTargets(): ProviderTarget[] {
       baseURL: "https://api.mistral.ai/v1",
       apiKey: key,
       model: "mistral-small-latest",
+      isVision: false,
+    });
+  });
+
+  // 3. OpenRouter Gemini 2.5 Flash
+  const openRouterKeys = getApiKeys("OPENROUTER_API_KEY");
+  openRouterKeys.forEach((key, idx) => {
+    targets.push({
+      name: `OpenRouter Gemini 2.5 Flash (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "google/gemini-2.5-flash",
+      isVision: false,
+    });
+  });
+
+  // 4. Google Gemini Direct
+  const geminiKeys = getApiKeys("GEMINI_API_KEY").concat(getApiKeys("GOOGLE_GENERATIVE_AI_API_KEY"));
+  geminiKeys.forEach((key, idx) => {
+    targets.push({
+      name: `Google Gemini 1.5 Flash (Clé ${idx + 1})`,
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      apiKey: key,
+      model: "gemini-1.5-flash",
       isVision: false,
     });
   });
@@ -236,10 +231,11 @@ async function executeWithWaterfall(
         model: target.model,
         messages,
         temperature: 0.1,
+        max_tokens: 2000,
       };
 
       // Ne forcer json_object que si le fournisseur le supporte de façon stable
-      if (!target.name.includes("Groq Vision")) {
+      if (!target.name.includes("Groq Vision") && !target.name.includes("Pixtral")) {
         completionParams.response_format = { type: "json_object" };
       }
 
