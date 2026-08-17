@@ -25,8 +25,8 @@ export default function HomePage() {
         {/* Action Buttons */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
           <Link href="/sign-up" className="group">
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               className="w-full h-24 flex flex-col items-center justify-center gap-2 text-lg bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all"
             >
               <UserPlus size={28} />
@@ -35,8 +35,8 @@ export default function HomePage() {
           </Link>
 
           <Link href="/sign-in" className="group">
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               className="w-full h-24 flex flex-col items-center justify-center gap-2 text-lg bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-200 shadow-lg hover:shadow-xl transition-all"
             >
               <LogIn size={28} />

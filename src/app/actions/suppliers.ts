@@ -55,6 +55,48 @@ export async function createSupplierAction(
   redirect("/suppliers");
 }
 
+export type QuickSupplierResult = {
+  error?: string;
+  supplier?: { id: string; name: string };
+};
+
+export async function createQuickSupplierAction(
+  name: string,
+  phone?: string,
+  email?: string
+): Promise<QuickSupplierResult> {
+  const cleanName = name.trim();
+  if (!cleanName) {
+    return { error: "Le nom du fournisseur est requis" };
+  }
+
+  const company = await getCurrentCompanyForAction();
+  if (!company) {
+    return { error: "Entreprise introuvable" };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("suppliers")
+    .insert({
+      company_id: company.id,
+      name: cleanName,
+      phone: phone || null,
+      email: email || null,
+    })
+    .select("id, name")
+    .single();
+
+  if (error || !data) {
+    console.error("Erreur créant fournisseur rapide:", error);
+    return { error: error?.message || "Erreur lors de la création du fournisseur" };
+  }
+
+  revalidatePath("/suppliers");
+  revalidatePath("/products");
+  return { supplier: data };
+}
+
 export async function updateSupplierAction(
   _prevState: ActionResult,
   formData: FormData,

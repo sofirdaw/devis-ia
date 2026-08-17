@@ -8,7 +8,6 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -35,27 +34,31 @@ export async function createCompanyAction(
   formData: FormData,
 ): Promise<ActionResult> {
   const parsed = CompanySchema.safeParse({
-    name: formData.get("name"),
-    phone: formData.get("phone"),
-    email: formData.get("email"),
-    address: formData.get("address"),
-    rccm: formData.get("rccm"),
-    ifu: formData.get("ifu"),
-    cme: formData.get("cme"),
-    default_quote_notes: formData.get("default_quote_notes"),
-    default_invoice_notes: formData.get("default_invoice_notes"),
+    name: formData.get("name") || "",
+    phone: formData.get("phone") || undefined,
+    email: formData.get("email") || undefined,
+    address: formData.get("address") || undefined,
+    rccm: formData.get("rccm") || undefined,
+    ifu: formData.get("ifu") || undefined,
+    cme: formData.get("cme") || undefined,
+    default_quote_notes: formData.get("default_quote_notes") || undefined,
+    default_invoice_notes: formData.get("default_invoice_notes") || undefined,
   });
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
 
-  const { userId } = await auth();
-  if (!userId) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
     return { error: "Vous devez être connecté pour créer une entreprise" };
   }
 
-  const supabase = await createClient();
+  const userId = user.id;
 
   // Empêche la création de plusieurs entreprises pour le même utilisateur
   // (ex: double clic, ou retour accidentel sur /setup).
@@ -145,15 +148,15 @@ export async function updateCompanyAction(
   formData: FormData,
 ): Promise<ActionResult> {
   const parsed = CompanySchema.safeParse({
-    name: formData.get("name"),
-    phone: formData.get("phone"),
-    email: formData.get("email"),
-    address: formData.get("address"),
-    rccm: formData.get("rccm"),
-    ifu: formData.get("ifu"),
-    cme: formData.get("cme"),
-    default_quote_notes: formData.get("default_quote_notes"),
-    default_invoice_notes: formData.get("default_invoice_notes"),
+    name: formData.get("name") || "",
+    phone: formData.get("phone") || undefined,
+    email: formData.get("email") || undefined,
+    address: formData.get("address") || undefined,
+    rccm: formData.get("rccm") || undefined,
+    ifu: formData.get("ifu") || undefined,
+    cme: formData.get("cme") || undefined,
+    default_quote_notes: formData.get("default_quote_notes") || undefined,
+    default_invoice_notes: formData.get("default_invoice_notes") || undefined,
   });
 
   if (!parsed.success) {

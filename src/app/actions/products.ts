@@ -16,7 +16,7 @@ import type { ActionResult } from "./auth";
 const ProductSchema = z.object({
   name: z.string().min(2, "Le nom du produit est requis"),
   description: z.string().optional(),
-  supplier_id: z.string().optional(),
+  supplier_id: z.string().min(1, "Veuillez sélectionner un fournisseur"),
   price: z.coerce.number().min(0, "Le prix doit être positif"),
 });
 
@@ -31,10 +31,16 @@ export async function createProductAction(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
+  const supplierIdRaw = formData.get("supplier_id");
+  const supplier_id =
+    typeof supplierIdRaw === "string" && supplierIdRaw.trim()
+      ? supplierIdRaw
+      : undefined;
+
   const parsed = ProductSchema.safeParse({
     name: formData.get("name"),
-    description: formData.get("description"),
-    supplier_id: formData.get("supplier_id"),
+    description: formData.get("description") || undefined,
+    supplier_id,
     price: formData.get("price"),
   });
 
@@ -67,10 +73,16 @@ export async function updateProductAction(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
+  const supplierIdRaw = formData.get("supplier_id");
+  const supplier_id =
+    typeof supplierIdRaw === "string" && supplierIdRaw.trim()
+      ? supplierIdRaw
+      : undefined;
+
   const parsed = ProductSchema.safeParse({
     name: formData.get("name"),
-    description: formData.get("description"),
-    supplier_id: formData.get("supplier_id"),
+    description: formData.get("description") || undefined,
+    supplier_id,
     price: formData.get("price"),
   });
 

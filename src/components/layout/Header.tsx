@@ -4,7 +4,7 @@
  * Affiche :
  * - Titre et description de la page courante
  * - Actions optionnelles (boutons à droite)
- * - Menu utilisateur Clerk (avatar, profil, sécurité, déconnexion)
+ * - Menu utilisateur Supabase Auth (avatar, profil, sécurité, déconnexion)
  */
 
 "use client";
@@ -38,7 +38,7 @@ export function Header({ title, description, actions, backButton }: HeaderProps)
           {/* Boutons d'action passés par la page parente */}
           {actions}
 
-          {/* Menu utilisateur — avatar Clerk avec dropdown profil */}
+          {/* Menu utilisateur — avatar Supabase avec dropdown profil */}
           <div className="hidden lg:block">
             <UserMenu />
           </div>

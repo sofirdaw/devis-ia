@@ -11,11 +11,13 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import { OfflineIndicator } from "@/components/pwa/OfflineIndicator";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
-import { useClerk } from "@clerk/nextjs";
+import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import {
   LayoutDashboard,
@@ -40,43 +42,43 @@ const NAV_ITEMS: {
   icon: typeof LayoutDashboard;
   highlight?: boolean;
 }[] = [
-  {
-    label: "Tableau de bord",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    label: "Devis IA",
-    href: "/quotes",
-    icon: Sparkles,
-   /* highlight: true,*/
-  },
-  {
-    label: "Factures",
-    href: "/invoices",
-    icon: Receipt,
-  },
-  {
-    label: "Créances",
-    href: "/receivables",
-    icon: DollarSign,
-  },
-  {
-    label: "Clients",
-    href: "/clients",
-    icon: Users,
-  },
-  {
-    label: "Produits",
-    href: "/products",
-    icon: Package,
-  },
-  {
-    label: "Fournisseurs",
-    href: "/suppliers",
-    icon: Factory,
-  },
-];
+    {
+      label: "Tableau de bord",
+      href: "/dashboard",
+      icon: LayoutDashboard,
+    },
+    {
+      label: "Devis IA",
+      href: "/quotes",
+      icon: Sparkles,
+      /* highlight: true,*/
+    },
+    {
+      label: "Factures",
+      href: "/invoices",
+      icon: Receipt,
+    },
+    {
+      label: "Créances",
+      href: "/receivables",
+      icon: DollarSign,
+    },
+    {
+      label: "Clients",
+      href: "/clients",
+      icon: Users,
+    },
+    {
+      label: "Produits",
+      href: "/products",
+      icon: Package,
+    },
+    {
+      label: "Fournisseurs",
+      href: "/suppliers",
+      icon: Factory,
+    },
+  ];
 
 const BOTTOM_ITEMS = [
   {
@@ -90,14 +92,14 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { company, reset } = useAuthStore();
-  const { signOut } = useClerk();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Déconnexion via Clerk
+  // Déconnexion via Supabase Auth
   const handleLogout = async () => {
     reset();
-    await signOut();
-    router.push("/sign-in");
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
   };
 
   // Fermer le menu mobile lors de la navigation
@@ -134,22 +136,33 @@ export function Sidebar() {
         )}
       >
         {/* Logo + Close button mobile */}
-        <div className="px-4 py-5 border-b border-gray-800 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2.5" onClick={handleLinkClick}>
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <FileText size={16} className="text-white" />
-            </div>
-            <span className="font-semibold text-white text-sm">
-              Devis<span className="text-primary-400">IA</span>
-            </span>
-          </Link>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="lg:hidden p-1 text-gray-400 hover:text-white"
-            aria-label="Fermer le menu"
-          >
-            <X size={20} />
-          </button>
+        <div className="px-4 py-4 border-b border-gray-800 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <Link href="/dashboard" className="flex items-center gap-2.5" onClick={handleLinkClick}>
+              <Image
+                src="/icons/icon-192x192.png"
+                width={28}
+                height={28}
+                alt="Devis IA"
+                className="rounded-lg shadow-sm"
+              />
+              <span className="font-semibold text-white text-sm">
+                Devis<span className="text-primary-400">IA</span>
+              </span>
+            </Link>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="lg:hidden p-1 text-gray-400 hover:text-white"
+              aria-label="Fermer le menu"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Badge réseau PWA */}
+          <div className="mt-1">
+            <OfflineIndicator />
+          </div>
         </div>
 
         {/* Navigation principale */}
@@ -169,8 +182,8 @@ export function Sidebar() {
                   isActive
                     ? "bg-primary-600 text-white"
                     : item.highlight
-                    ? "text-primary-400 hover:bg-gray-800 hover:text-primary-300"
-                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                      ? "text-primary-400 hover:bg-gray-800 hover:text-primary-300"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
                 )}
               >
                 <Icon size={18} />
@@ -209,14 +222,6 @@ export function Sidebar() {
               </Link>
             );
           })}
-
-          {/* Nom de l'entreprise */}
-          {company && (
-            <div className="flex items-center gap-2 px-3 py-2">
-              <Building2 size={16} className="text-gray-600 shrink-0" />
-              <span className="text-xs text-gray-500 truncate">{company.name}</span>
-            </div>
-          )}
 
           {/* Bouton déconnexion */}
           <button

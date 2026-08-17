@@ -34,6 +34,7 @@ import { ImageUploadZone } from "./ImageUploadZone";
 import { VoiceInputButton } from "./VoiceInputButton";
 import type { Client, Product } from "@/types";
 import type { LineItem } from "@/components/documents/LineItemsEditor";
+import { parseDocumentOfflineText } from "@/lib/offline-parser";
 
 interface AIGeneratorPanelProps {
   documentType: "quote" | "invoice";
@@ -63,22 +64,55 @@ export function AIGeneratorPanel({
   const handleGenerate = () => {
     setError(null);
     startTransition(async () => {
-      const response =
-        mode === "text"
-          ? await generateDocumentFromText(description)
-          : imageBase64
-            ? await generateDocumentFromImage(imageBase64)
-            : {
-                success: false as const,
-                error: "Veuillez sélectionner une image",
-              };
+      // Détecter si l'appareil est hors-ligne
+      const isOffline = typeof window !== "undefined" && !navigator.onLine;
 
-      if (!response.success || !response.data) {
-        setError(response.error ?? "Erreur inconnue");
+      if (isOffline && mode === "text") {
+        const offlineResult = parseDocumentOfflineText(description, clients, products);
+        if (!offlineResult.success || !offlineResult.data) {
+          setError(offlineResult.error ?? "Impossible de parser le texte en local");
+          return;
+        }
+        setResult(offlineResult.data);
         return;
       }
 
-      setResult(response.data);
+      try {
+        const response =
+          mode === "text"
+            ? await generateDocumentFromText(description)
+            : imageBase64
+              ? await generateDocumentFromImage(imageBase64)
+              : {
+                  success: false as const,
+                  error: "Veuillez sélectionner une image",
+                };
+
+        if (!response.success || !response.data) {
+          // Fallback automatique si la requête réseau échoue en mode texte
+          if (mode === "text") {
+            const fallbackResult = parseDocumentOfflineText(description, clients, products);
+            if (fallbackResult.success && fallbackResult.data) {
+              setResult(fallbackResult.data);
+              return;
+            }
+          }
+          setError(response.error ?? "Erreur inconnue");
+          return;
+        }
+
+        setResult(response.data);
+      } catch {
+        // En cas d'exception réseau brutale
+        if (mode === "text") {
+          const fallbackResult = parseDocumentOfflineText(description, clients, products);
+          if (fallbackResult.success && fallbackResult.data) {
+            setResult(fallbackResult.data);
+            return;
+          }
+        }
+        setError("Connexion réseau indisponible. Passez en mode texte pour l'analyse locale.");
+      }
     });
   };
 

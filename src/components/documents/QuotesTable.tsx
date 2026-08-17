@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { getOfflineQuotes } from "@/lib/offline-db";
 import type { Quote, QuoteStatus } from "@/types";
 
 interface QuotesTableProps {
@@ -36,22 +37,53 @@ const STATUS_FILTERS: { value: QuoteStatus | "all"; label: string }[] = [
 export function QuotesTable({ quotes }: QuotesTableProps) {
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [offlineQuotes, setOfflineQuotes] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadOffline() {
+      const offline = await getOfflineQuotes();
+      setOfflineQuotes(offline);
+    }
+    loadOffline();
+
+    const handleSyncComplete = () => {
+      loadOffline();
+    };
+
+    window.addEventListener("pwa-sync-complete", handleSyncComplete);
+    return () => window.removeEventListener("pwa-sync-complete", handleSyncComplete);
+  }, []);
+
+  const combinedQuotes = useMemo(() => {
+    const formattedOffline = offlineQuotes
+      .filter((off) => off.sync_status === "pending_create")
+      .map((off) => ({
+        id: off.id,
+        quote_number: `${off.quote_number} (Local 🟡)`,
+        client: { name: off.client_name || "Client Local" },
+        status: off.status,
+        total: off.total,
+        created_at: off.created_at,
+        is_offline: true,
+      }));
+    return [...formattedOffline, ...quotes];
+  }, [quotes, offlineQuotes]);
 
   // KPIs
   const kpis = useMemo(() => {
-    const totalCount = quotes.length;
-    const acceptedAmount = quotes
+    const totalCount = combinedQuotes.length;
+    const acceptedAmount = combinedQuotes
       .filter((q) => q.status === "accepted")
       .reduce((sum, q) => sum + Number(q.total), 0);
-    const pendingAmount = quotes
+    const pendingAmount = combinedQuotes
       .filter((q) => q.status === "sent" || q.status === "draft")
       .reduce((sum, q) => sum + Number(q.total), 0);
 
     return { totalCount, acceptedAmount, pendingAmount };
-  }, [quotes]);
+  }, [combinedQuotes]);
 
   const filteredQuotes = useMemo(() => {
-    return quotes.filter((q) => {
+    return combinedQuotes.filter((q) => {
       const matchesStatus = statusFilter === "all" || q.status === statusFilter;
       const matchesSearch =
         q.quote_number.toLowerCase().includes(searchQuery.toLowerCase()) ||

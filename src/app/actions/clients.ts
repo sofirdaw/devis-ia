@@ -22,7 +22,7 @@ const ClientSchema = z.object({
 });
 
 /**
- * Récupère l'id de l'entreprise de l'utilisateur Clerk connecté.
+ * Récupère l'id de l'entreprise de l'utilisateur Supabase connecté.
  * Utilisé au début de chaque action pour scoper les requêtes.
  */
 async function getCurrentCompanyId(): Promise<string | null> {

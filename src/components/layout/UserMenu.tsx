@@ -1,25 +1,19 @@
 /**
- * Composant UserMenu — Menu déroulant utilisateur
- *
- * Affiche l'avatar de l'utilisateur connecté (initiales ou photo de profil Clerk)
- * avec un dropdown permettant :
- * - Voir le profil (nom, email)
- * - Ouvrir le modal Clerk pour modifier le profil / changer le mot de passe
- * - Se déconnecter
+ * Composant UserMenu — Menu déroulant utilisateur avec Supabase Auth
  */
 
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useUser, useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth.store";
+import { createClient } from "@/lib/supabase/client";
 import {
   User,
-  KeyRound,
+  Settings,
   LogOut,
   ChevronDown,
-  Settings2,
   Loader2,
 } from "lucide-react";
 import Image from "next/image";
@@ -29,8 +23,7 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ className }: UserMenuProps = {}) {
-  const { user, isLoaded } = useUser();
-  const { signOut, openUserProfile } = useClerk();
+  const { user, company, reset, isLoading } = useAuthStore();
   const router = useRouter();
 
   const [open, setOpen] = useState(false);
@@ -49,29 +42,34 @@ export function UserMenu({ className }: UserMenuProps = {}) {
 
   const handleSignOut = async () => {
     setOpen(false);
-    await signOut();
-    router.push("/sign-in");
+    reset();
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
   };
 
-  const handleOpenProfile = (initialPage?: "profile" | "security") => {
+  const handleOpenSettings = () => {
     setOpen(false);
-    // Clerk UserProfile modal — ouvre directement sur la bonne section
-    openUserProfile(
-      initialPage === "security" ? { additionalOAuthScopes: {} } : undefined,
-    );
+    router.push("/settings");
   };
 
-  // Avatar : photo Clerk ou initiales
-  const avatarUrl = user?.imageUrl;
-  const displayName =
-    user?.fullName ||
-    user?.username ||
-    user?.primaryEmailAddress?.emailAddress ||
+  // Infomations utilisateur Supabase
+  const email = user?.email ?? "";
+  const fullName =
+    (user?.user_metadata?.full_name as string) ||
+    (user?.user_metadata?.name as string) ||
+    company?.name ||
+    email.split("@")[0] ||
     "Utilisateur";
-  const email = user?.primaryEmailAddress?.emailAddress ?? "";
-  const initials = displayName.slice(0, 2).toUpperCase();
 
-  if (!isLoaded) {
+  const avatarUrl =
+    (user?.user_metadata?.avatar_url as string) ||
+    (user?.user_metadata?.picture as string) ||
+    null;
+
+  const initials = fullName.slice(0, 2).toUpperCase();
+
+  if (isLoading) {
     return (
       <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
         <Loader2 size={14} className="text-primary-500 animate-spin" />
@@ -85,7 +83,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
       <button
         id="user-menu-trigger"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 hover:bg-gray-100 transition-colors group"
+        className="flex items-center gap-2 rounded-full pl-1 pr-2.5 py-1 bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors group"
         aria-haspopup="true"
         aria-expanded={open}
       >
@@ -94,7 +92,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
           {avatarUrl ? (
             <Image
               src={avatarUrl}
-              alt={displayName}
+              alt={fullName}
               width={32}
               height={32}
               className="object-cover w-full h-full"
@@ -104,16 +102,15 @@ export function UserMenu({ className }: UserMenuProps = {}) {
           )}
         </div>
 
-        {/* Nom affiché (masqué sur petits écrans) */}
-        <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[120px] truncate">
-          {displayName}
+        {/* Nom affiché */}
+        <span className="hidden sm:block text-sm font-semibold text-gray-900 max-w-[140px] truncate">
+          {fullName}
         </span>
 
         <ChevronDown
           size={14}
-          className={`text-gray-400 transition-transform duration-200 ${
-            open ? "rotate-180" : ""
-          }`}
+          className={`text-gray-500 transition-transform duration-200 shrink-0 ${open ? "rotate-180" : ""
+            }`}
         />
       </button>
 
@@ -130,7 +127,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
                 {avatarUrl ? (
                   <Image
                     src={avatarUrl}
-                    alt={displayName}
+                    alt={fullName}
                     width={40}
                     height={40}
                     className="object-cover w-full h-full"
@@ -141,7 +138,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-900 truncate">
-                  {displayName}
+                  {fullName}
                 </p>
                 <p className="text-xs text-gray-500 truncate">{email}</p>
               </div>
@@ -152,7 +149,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
           <div className="py-1">
             <button
               id="user-menu-profile"
-              onClick={() => handleOpenProfile("profile")}
+              onClick={handleOpenSettings}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
               role="menuitem"
             >
@@ -160,23 +157,8 @@ export function UserMenu({ className }: UserMenuProps = {}) {
                 <User size={14} className="text-blue-600" />
               </div>
               <div className="text-left">
-                <p className="font-medium">Mon profil</p>
-                <p className="text-xs text-gray-400">Nom, prénom, photo…</p>
-              </div>
-            </button>
-
-            <button
-              id="user-menu-security"
-              onClick={() => handleOpenProfile("security")}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              role="menuitem"
-            >
-              <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-                <KeyRound size={14} className="text-amber-600" />
-              </div>
-              <div className="text-left">
-                <p className="font-medium">Sécurité</p>
-                <p className="text-xs text-gray-400">Mot de passe, 2FA…</p>
+                <p className="font-medium">Mon profil & Paramètres</p>
+                <p className="text-xs text-gray-400">Entreprise, devises, logo…</p>
               </div>
             </button>
           </div>

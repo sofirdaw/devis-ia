@@ -39,9 +39,7 @@ export default function SetupPage() {
       <div className="w-full max-w-lg">
         {/* En-tête */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-xl mb-4">
-            <Building2 size={22} className="text-white" />
-          </div>
+
           <h1 className="text-2xl font-bold text-gray-900">
             Parlez-nous de votre entreprise
           </h1>
@@ -155,18 +153,18 @@ export default function SetupPage() {
               />
             </div>
 
-            <Input
+            {/*<Input
               name="default_quote_notes"
               label="Notes par défaut (Devis)"
               placeholder="Notes automatiques pour les devis"
             />
 
-            <Input
+            {<Input
               name="default_invoice_notes"
               label="Notes par défaut (Factures)"
               placeholder="Notes automatiques pour les factures"
             />
-
+*/}
             <Button type="submit" className="w-full" size="lg" isLoading={isPending}>
               {isPending ? "Création..." : "Continuer vers le tableau de bord"}
             </Button>

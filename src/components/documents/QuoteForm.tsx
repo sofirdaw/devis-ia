@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { LineItemsEditor, type LineItem } from "./LineItemsEditor";
 import { TotalsSummary } from "./TotalsSummary";
 import { createQuoteAction } from "@/app/actions/quotes";
+import { useRouter } from "next/navigation";
+import { saveOfflineQuote, addToSyncQueue } from "@/lib/offline-db";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Client, Product } from "@/types";
 
@@ -46,6 +48,7 @@ export function QuoteForm({
   initialDate,
   defaultNotes,
 }: QuoteFormProps) {
+  const router = useRouter();
   const [items, setItems] = useState<LineItem[]>(
     initialItems?.length
       ? initialItems
@@ -53,14 +56,67 @@ export function QuoteForm({
   );
   const [discount, setDiscount] = useState(0);
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(initialClientId);
+  const [isSavingOffline, setIsSavingOffline] = useState(false);
   const [state, formAction, isPending] = useActionState(createQuoteAction, initialState);
   const formRef = useRef<HTMLFormElement>(null);
 
   const clientOptions = clients.map((c) => ({ value: c.id, label: c.name }));
   const selectedClient = clients.find((c) => c.id === selectedClientId);
 
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    if (typeof window !== "undefined" && !navigator.onLine) {
+      e.preventDefault();
+      setIsSavingOffline(true);
+
+      const localId = `off_${Date.now()}`;
+      const quoteNum = `DEV-OFF-${Math.floor(100 + Math.random() * 900)}`;
+
+      const subtotal = items.reduce(
+        (acc, item) => acc + (item.quantity || 0) * (item.unit_price || 0),
+        0
+      );
+      const tax = (subtotal - discount) * (taxRate / 100);
+      const total = subtotal - discount + tax;
+
+      const notesInput = formRef.current?.querySelector('[name="notes"]') as HTMLTextAreaElement;
+
+      const offlineQuote = {
+        id: localId,
+        quote_number: quoteNum,
+        client_name: selectedClient?.name || "Client Local",
+        client_id: selectedClientId,
+        status: "draft" as const,
+        total,
+        subtotal,
+        tax,
+        discount,
+        notes: notesInput?.value || defaultNotes || "",
+        created_at: new Date().toISOString(),
+        items: items.map((i) => ({
+          designation: i.designation,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          total: i.quantity * i.unit_price,
+        })),
+        sync_status: "pending_create" as const,
+      };
+
+      await saveOfflineQuote(offlineQuote);
+      await addToSyncQueue("CREATE_QUOTE", {
+        client_id: selectedClientId,
+        discount,
+        notes: offlineQuote.notes,
+        items,
+        local_quote: offlineQuote,
+      });
+
+      setIsSavingOffline(false);
+      router.push("/quotes");
+    }
+  };
+
   return (
-    <form ref={formRef} action={formAction} className="space-y-6">
+    <form ref={formRef} action={formAction} onSubmit={handleSubmit} className="space-y-6">
       {state.error && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm" role="alert">
           {state.error}
@@ -141,8 +197,8 @@ export function QuoteForm({
         </div>
 
         <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 lg:pt-6 border-t border-gray-100 mt-6 lg:mt-8">
-          <Button type="submit" size="lg" isLoading={isPending} className="w-full sm:w-auto px-8 lg:px-10 shadow-lg">
-            {isPending ? "Création..." : "Créer le devis"}
+          <Button type="submit" size="lg" isLoading={isPending || isSavingOffline} className="w-full sm:w-auto px-8 lg:px-10 shadow-lg">
+            {isSavingOffline ? "Sauvegarde locale..." : isPending ? "Création..." : "Créer le devis"}
           </Button>
         </div>
       </div>

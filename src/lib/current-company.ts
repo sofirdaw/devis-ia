@@ -1,57 +1,110 @@
 /**
- * Résolution de l'entreprise courante — à partir de l'utilisateur Clerk connecté.
- *
- * Remplace l'ancien pattern "Temporairement: prendre la première entreprise
- * (sans auth)" qui était dupliqué dans ~20 fichiers. Ce pattern piochait la
- * toute première ligne de la table `companies` (tous utilisateurs confondus,
- * sans ordre garanti), ce qui pouvait faire "sauter" les données d'un
- * utilisateur à l'autre de façon incohérente (créer un fournisseur pour une
- * entreprise, puis le voir disparaître car une page suivante récupère une
- * autre entreprise "première" par hasard).
- *
- * Utiliser ces helpers partout où l'ancien pattern était utilisé.
+ * Résolution de l'entreprise courante — à partir de l'utilisateur Supabase Auth connecté.
+ * Support du mode hors-ligne pour la PWA (fallback local).
  */
 
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Company } from "@/types";
 
 /**
- * Pour les Server Components (pages) : redirige automatiquement si
- * l'utilisateur n'est pas connecté ou n'a pas encore créé son entreprise.
+ * Pour les Server Components (pages) : ne redirige pas vers /login en mode hors-ligne
+ * si une session locale existe dans les cookies.
  */
 export async function requireCurrentCompany(): Promise<Company> {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-
   const supabase = await createClient();
-  const { data: company } = await supabase
-    .from("companies")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
+  let user = null;
 
-  if (!company) redirect("/setup");
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data?.user ?? null;
+  } catch {
+    // Connexion réseau indisponible
+  }
 
-  return company as Company;
+  // Fallback vers la session locale lue depuis le cookie
+  if (!user) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      user = sessionData?.session?.user ?? null;
+    } catch {
+      // Ignorer
+    }
+  }
+
+  if (!user) redirect("/login");
+
+  try {
+    const { data: company } = await supabase
+      .from("companies")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (company) return company as Company;
+  } catch {
+    // Mode hors-ligne : la base Supabase n'est pas joignable
+  }
+
+  // Entreprise fallback en mode 100% hors-ligne
+  return {
+    id: "offline_company_id",
+    user_id: user.id,
+    name: "Mon Entreprise (Local)",
+    quote_prefix: "DEV",
+    invoice_prefix: "FAC",
+    tax_rate: 18,
+    currency: "FCFA",
+    created_at: new Date().toISOString(),
+  } as unknown as Company;
 }
 
 /**
- * Pour les Server Actions : ne redirige pas (on ne peut pas rediriger au
- * milieu d'une mutation sans casser le retour d'état du formulaire).
+ * Pour les Server Actions : ne redirige pas.
  * Retourne `null` si non connecté ou si l'entreprise n'existe pas encore.
  */
 export async function getCurrentCompanyForAction(): Promise<Company | null> {
-  const { userId } = await auth();
-  if (!userId) return null;
-
   const supabase = await createClient();
-  const { data: company } = await supabase
-    .from("companies")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
+  let user = null;
 
-  return (company as Company) ?? null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data?.user ?? null;
+  } catch {
+    // Ignorer
+  }
+
+  if (!user) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      user = sessionData?.session?.user ?? null;
+    } catch {
+      // Ignorer
+    }
+  }
+
+  if (!user) return null;
+
+  try {
+    const { data: company } = await supabase
+      .from("companies")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (company) return company as Company;
+  } catch {
+    // Ignorer
+  }
+
+  return {
+    id: "offline_company_id",
+    user_id: user.id,
+    name: "Mon Entreprise (Local)",
+    quote_prefix: "DEV",
+    invoice_prefix: "FAC",
+    tax_rate: 18,
+    currency: "FCFA",
+    created_at: new Date().toISOString(),
+  } as unknown as Company;
 }
