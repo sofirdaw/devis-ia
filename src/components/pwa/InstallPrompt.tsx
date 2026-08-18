@@ -2,32 +2,33 @@
 
 import { useEffect, useState } from "react";
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
 export function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isIOS, setIsIOS] = useState(false);
-  const [showIOSPrompt, setShowIOSPrompt] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isIOS] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+  });
+  const [isStandalone] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      Boolean((window.navigator as unknown as { standalone?: boolean }).standalone)
+    );
+  });
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Détecter si déjà installé en PWA / standalone
-    const isStandaloneApp =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true;
-
-    setIsStandalone(isStandaloneApp);
-
-    // Détecter iOS Safari
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
-    setIsIOS(isIosDevice);
-
     // Écouter l'événement Chrome/Android beforeinstallprompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
@@ -63,7 +64,7 @@ export function InstallPrompt() {
             <div>
               <p className="text-sm font-semibold">Installer Devis IA</p>
               <p className="text-xs text-slate-300">
-                Utilisez l'application 100% hors-ligne sur votre écran d'accueil.
+                Utilisez l&apos;application 100% hors-ligne sur votre écran d&apos;accueil.
               </p>
             </div>
           </div>
@@ -85,7 +86,7 @@ export function InstallPrompt() {
       )}
 
       {/* Guide d'installation spécifique iOS Safari */}
-      {isIOS && !showIOSPrompt && (
+      {isIOS && (
         <div className="fixed bottom-4 left-4 right-4 bg-white p-4 rounded-2xl shadow-2xl border border-gray-200 z-50 flex items-center justify-between gap-3 text-gray-800">
           <div className="flex items-center gap-3">
             <span className="text-2xl">📱</span>
@@ -93,7 +94,7 @@ export function InstallPrompt() {
               <p className="text-xs font-bold">Installer sur iPhone / iPad</p>
               <p className="text-[11px] text-gray-500">
                 Appuyez sur <span className="font-semibold text-primary-600">Partager ⎋</span> puis{" "}
-                <span className="font-semibold text-primary-600">"Sur l'écran d'accueil" ➕</span>
+                <span className="font-semibold text-primary-600">&quot;Sur l&apos;écran d&apos;accueil&quot; ➕</span>
               </p>
             </div>
           </div>

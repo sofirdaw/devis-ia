@@ -23,12 +23,10 @@ import {
   LayoutDashboard,
   Users,
   Package,
-  FileText,
   Receipt,
   Settings,
   LogOut,
   Sparkles,
-  Building2,
   DollarSign,
   Factory,
   Menu,
@@ -138,16 +136,27 @@ export function Sidebar() {
         {/* Logo + Close button mobile */}
         <div className="px-4 py-4 border-b border-gray-800 flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <Link href="/dashboard" className="flex items-center gap-2.5" onClick={handleLinkClick}>
-              <Image
-                src="/icons/icon-192x192.png"
-                width={28}
-                height={28}
-                alt="Devis IA"
-                className="rounded-lg shadow-sm"
-              />
-              <span className="font-semibold text-white text-sm">
-                Devis<span className="text-primary-400">IA</span>
+            <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0" onClick={handleLinkClick}>
+              {company?.logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={company.logo_url}
+                  alt={company.name || "Logo"}
+                  className="w-7 h-7 object-contain rounded-lg bg-white p-0.5 shadow-sm shrink-0"
+                />
+              ) : (
+                <Image
+                  src="/icons/icon-192x192.png"
+                  width={28}
+                  height={28}
+                  alt="Devis IA"
+                  className="rounded-lg shadow-sm shrink-0"
+                />
+              )}
+              <span className="font-semibold text-white text-sm truncate">
+                {company?.name ? company.name : (
+                  <>Devis<span className="text-primary-400">IA</span></>
+                )}
               </span>
             </Link>
             <button

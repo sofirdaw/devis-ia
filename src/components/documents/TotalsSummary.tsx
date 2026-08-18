@@ -3,7 +3,6 @@
  * Affiché à droite du formulaire de devis/facture
  */
 
-import { Input } from "@/components/ui/input";
 import { formatCurrency, calculateTotals } from "@/lib/utils";
 import type { LineItem } from "./LineItemsEditor";
 

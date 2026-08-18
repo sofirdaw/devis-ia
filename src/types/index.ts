@@ -23,6 +23,9 @@ export type Company = {
   rccm: string | null; // Registre du Commerce et des Sociétés
   ifu: string | null; // Identifiant Fiscal Unique
   cme: string | null; // Centre des Métiers et de l'Entreprise
+  bank_name?: string | null;
+  bank_account?: string | null;
+  iban?: string | null;
   default_quote_notes: string | null; // Notes par défaut pour les devis
   default_invoice_notes: string | null; // Notes par défaut pour les factures
   created_at: string;
@@ -39,6 +42,8 @@ export type Client = {
   phone: string | null;
   email: string | null;
   address: string | null;
+  code?: string | null;
+  ifu?: string | null;
   created_at: string;
 };
 

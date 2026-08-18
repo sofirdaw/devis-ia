@@ -18,7 +18,7 @@ export default function HomePage() {
             Devis<span className="text-blue-600">IA</span>
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Créez des devis professionnels en quelques secondes grâce à l'intelligence artificielle
+            Créez des devis professionnels en quelques secondes grâce à l&apos;intelligence artificielle
           </p>
         </div>
 
@@ -30,7 +30,7 @@ export default function HomePage() {
               className="w-full h-24 flex flex-col items-center justify-center gap-2 text-lg bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all"
             >
               <UserPlus size={28} />
-              S'inscrire
+              S&apos;inscrire
             </Button>
           </Link>
 
@@ -67,7 +67,7 @@ export default function HomePage() {
               <Server size={24} className="text-purple-600" />
             </div>
             <h3 className="font-semibold text-gray-900 mb-2">IA intégrée</h3>
-            <p className="text-gray-600 text-sm">L'IA vous aide à rédiger vos devis</p>
+            <p className="text-gray-600 text-sm">L&apos;IA vous aide à rédiger vos devis</p>
           </div>
         </div>
       </div>

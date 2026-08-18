@@ -2,8 +2,14 @@
  * Moteur de synchronisation automatique avec Supabase Cloud lors du retour du réseau.
  */
 
-import { getSyncQueue, removeFromSyncQueue, saveOfflineQuote } from "./offline-db";
+import {
+  getSyncQueue,
+  removeFromSyncQueue,
+  saveOfflineQuote,
+  saveOfflineInvoice,
+} from "./offline-db";
 import { createQuoteAction } from "@/app/actions/quotes";
+import { createInvoiceAction } from "@/app/actions/invoices";
 
 let isSyncing = false;
 
@@ -27,22 +33,44 @@ export async function syncPendingData(): Promise<{ syncedCount: number }> {
 
     for (const item of queue) {
       try {
+        // Cast payload to a typed helper for safe FormData construction
+        const p = item.payload as Record<string, unknown>;
+
         if (item.action === "CREATE_QUOTE") {
           const formData = new FormData();
-          formData.append("client_id", item.payload.client_id || "");
-          formData.append("discount", item.payload.discount || 0);
-          formData.append("notes", item.payload.notes || "");
-          formData.append("items", JSON.stringify(item.payload.items || []));
+          formData.append("client_id", String(p.client_id ?? ""));
+          formData.append("discount", String(p.discount ?? 0));
+          formData.append("notes", String(p.notes ?? ""));
+          formData.append("items", JSON.stringify(p.items ?? []));
 
           const result = await createQuoteAction({}, formData);
 
           if (!result?.error) {
-            // Marquer comme synchro localement
-            if (item.payload.local_quote) {
+            if (p.local_quote) {
               await saveOfflineQuote({
-                ...item.payload.local_quote,
+                ...(p.local_quote as object),
                 sync_status: "synced",
-              });
+              } as Parameters<typeof saveOfflineQuote>[0]);
+            }
+            await removeFromSyncQueue(item.id);
+            syncedCount++;
+          }
+        } else if (item.action === "CREATE_INVOICE") {
+          const formData = new FormData();
+          formData.append("client_id", String(p.client_id ?? ""));
+          formData.append("discount", String(p.discount ?? 0));
+          formData.append("due_date", String(p.due_date ?? ""));
+          formData.append("notes", String(p.notes ?? ""));
+          formData.append("items", JSON.stringify(p.items ?? []));
+
+          const result = await createInvoiceAction({}, formData);
+
+          if (!result?.error) {
+            if (p.local_invoice) {
+              await saveOfflineInvoice({
+                ...(p.local_invoice as object),
+                sync_status: "synced",
+              } as Parameters<typeof saveOfflineInvoice>[0]);
             }
             await removeFromSyncQueue(item.id);
             syncedCount++;

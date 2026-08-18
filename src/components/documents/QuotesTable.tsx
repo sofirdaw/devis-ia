@@ -13,13 +13,12 @@ import {
   Search,
   CheckCircle,
   Clock,
-  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { getOfflineQuotes } from "@/lib/offline-db";
+import { getOfflineQuotes, type OfflineQuote } from "@/lib/offline-db";
 import type { Quote, QuoteStatus } from "@/types";
 
 interface QuotesTableProps {
@@ -37,7 +36,7 @@ const STATUS_FILTERS: { value: QuoteStatus | "all"; label: string }[] = [
 export function QuotesTable({ quotes }: QuotesTableProps) {
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [offlineQuotes, setOfflineQuotes] = useState<any[]>([]);
+  const [offlineQuotes, setOfflineQuotes] = useState<OfflineQuote[]>([]);
 
   useEffect(() => {
     async function loadOffline() {
@@ -55,7 +54,7 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
   }, []);
 
   const combinedQuotes = useMemo(() => {
-    const formattedOffline = offlineQuotes
+    const formattedOffline: Quote[] = offlineQuotes
       .filter((off) => off.sync_status === "pending_create")
       .map((off) => ({
         id: off.id,
@@ -63,9 +62,16 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
         client: { name: off.client_name || "Client Local" },
         status: off.status,
         total: off.total,
+        company_id: "offline_company",
+        client_id: off.client_id || "",
+        subtotal: off.subtotal,
+        tax: off.tax,
+        discount: off.discount,
+        notes: off.notes || "",
+        valid_until: null,
         created_at: off.created_at,
         is_offline: true,
-      }));
+      } as unknown as Quote));
     return [...formattedOffline, ...quotes];
   }, [quotes, offlineQuotes]);
 
@@ -92,7 +98,7 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
           .includes(searchQuery.toLowerCase());
       return matchesStatus && matchesSearch;
     });
-  }, [quotes, statusFilter, searchQuery]);
+  }, [combinedQuotes, statusFilter, searchQuery]);
 
   return (
     <div className="space-y-6">
@@ -178,7 +184,7 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
               size="sm"
               leftIcon={<Sparkles size={10} className="text-blue-600" />}
             >
-              Générer avec l'IA
+              Générer avec l&apos;IA
             </Button>
           </Link>
           <Link href="/quotes/new">
@@ -196,7 +202,7 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
             Aucun devis trouvé
           </p>
           <p className="text-gray-400 text-xs mt-1">
-            Essayez d'ajuster vos critères de recherche ou de filtre
+            Essayez d&apos;ajuster vos critères de recherche ou de filtre
           </p>
         </div>
       ) : (

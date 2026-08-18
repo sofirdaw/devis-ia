@@ -1,5 +1,5 @@
 /**
- * Page Liste des Devis — Server Component
+ * Page Liste des Devis — Server Component résilient hors-ligne
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -13,37 +13,40 @@ import { Button } from "@/components/ui/button";
 
 export default async function QuotesPage() {
   const company = await requireCurrentCompany();
-  const supabase = await createClient();
+  let quotes: Quote[] = [];
 
-  // Jointure avec le client pour afficher son nom directement
-  const { data: quotes } = await supabase
-    .from("quotes")
-    .select("*, client:clients(*)")
-    .eq("company_id", company.id)
-    .order("created_at", { ascending: false });
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("quotes")
+      .select("*, client:clients(*)")
+      .eq("company_id", company.id)
+      .order("created_at", { ascending: false });
+    if (data) quotes = data as Quote[];
+  } catch {
+    // Mode hors-ligne
+  }
 
   return (
     <>
-      <Header 
+      <Header
         title="Devis"
-        description="Gérez vos devis et suivez leur statut" 
-       
+        description="Gérez vos devis et suivez leur statut"
         actions={
           <Link href="/dashboard">
             <Button
               variant="ghost"
               size="sm"
               leftIcon={<ArrowLeft size={14} />}
-              className="flex sm:hidde"
-             
+              className="flex sm:hidden"
             >
               Retour
             </Button>
           </Link>
-        } 
+        }
       />
       <div className="page-container">
-        <QuotesTable quotes={(quotes as Quote[]) ?? []} />
+        <QuotesTable quotes={quotes} />
       </div>
     </>
   );

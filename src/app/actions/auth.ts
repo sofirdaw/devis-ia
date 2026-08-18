@@ -64,7 +64,7 @@ export async function loginAction(
     }
 
     redirect("/dashboard");
-  } catch (error: any) {
+  } catch (error: unknown) {
     unstable_rethrow(error);
     console.error("Login action error:", error);
     return { error: "Erreur de connexion. Veuillez rééteindre ou réessayer." };

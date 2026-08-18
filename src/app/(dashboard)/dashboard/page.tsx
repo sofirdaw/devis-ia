@@ -14,6 +14,8 @@ import { RecentDocumentsList } from "@/components/dashboard/RecentDocumentsList"
 import { getDashboardStats } from "@/app/actions/dashboard";
 import { formatCurrency } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const stats = await getDashboardStats();
 

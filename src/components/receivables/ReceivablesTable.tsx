@@ -13,7 +13,7 @@ import { useState, useMemo } from "react";
 import { Search, DollarSign, Calendar, FileText, ArrowRight, Pencil, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
 import { ReceivableFormDialog } from "./ReceivableFormDialog";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -90,7 +90,6 @@ export function ReceivablesTable({ initialReceivables }: ReceivablesTableProps) 
               <tbody className="divide-y divide-gray-100">
                 {filteredReceivables.map((receivable) => {
                   const status = statusConfig[receivable.status as keyof typeof statusConfig];
-                  const progressPercent = (Number(receivable.paid_amount) / Number(receivable.total_amount)) * 100;
 
                   return (
                     <tr key={receivable.id} className="hover:bg-gray-50/50 transition-colors">

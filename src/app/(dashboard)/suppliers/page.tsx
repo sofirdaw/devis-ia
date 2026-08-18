@@ -1,5 +1,5 @@
 /**
- * Page Liste des Fournisseurs
+ * Page Liste des Fournisseurs — Server Component résilient hors-ligne
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -13,13 +13,19 @@ import type { Supplier } from "@/types";
 
 export default async function SuppliersPage() {
   const company = await requireCurrentCompany();
-  const supabase = await createClient();
+  let suppliers: Supplier[] = [];
 
-  const { data: suppliers } = await supabase
-    .from("suppliers")
-    .select("*")
-    .eq("company_id", company.id)
-    .order("name");
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("suppliers")
+      .select("*")
+      .eq("company_id", company.id)
+      .order("name");
+    if (data) suppliers = data as Supplier[];
+  } catch {
+    // Mode hors-ligne
+  }
 
   return (
     <>
@@ -45,7 +51,7 @@ export default async function SuppliersPage() {
             <Button leftIcon={<Plus size={16} />}>Nouveau fournisseur</Button>
           </Link>
         </div>
-        <SuppliersTable suppliers={(suppliers as Supplier[]) ?? []} />
+        <SuppliersTable suppliers={suppliers} />
       </div>
     </>
   );

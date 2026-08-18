@@ -18,7 +18,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
       <h3 className="text-sm font-medium text-gray-700 mb-4">
-        Chiffre d'affaires mensuel ({new Date().getFullYear()})
+        Chiffre d&apos;affaires mensuel ({new Date().getFullYear()})
       </h3>
 
       {!hasData ? (

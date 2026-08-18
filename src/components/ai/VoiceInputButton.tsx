@@ -39,25 +39,29 @@ interface VoiceInputButtonProps {
   disabled?: boolean;
 }
 
+type WindowWithSpeech = {
+  SpeechRecognition?: new () => SpeechRecognitionInstance;
+  webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
+};
+
+function getSpeechRecognitionAPI(): (new () => SpeechRecognitionInstance) | undefined {
+  if (typeof window === "undefined") return undefined;
+  const w = window as unknown as WindowWithSpeech;
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
+}
+
 export function VoiceInputButton({ onTranscript, disabled }: VoiceInputButtonProps) {
   const [isListening, setIsListening] = useState(false);
-  const [isSupported, setIsSupported] = useState(false);
+  const [isSupported] = useState(() => Boolean(getSpeechRecognitionAPI()));
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   useEffect(() => {
-    // Détection du support navigateur (préfixe webkit pour Chrome/Safari)
-    const SpeechRecognitionAPI =
-      (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionInstance; webkitSpeechRecognition?: new () => SpeechRecognitionInstance })
-        .SpeechRecognition ??
-      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionInstance })
-        .webkitSpeechRecognition;
+    const SpeechRecognitionAPI = getSpeechRecognitionAPI();
 
     if (!SpeechRecognitionAPI) {
-      setIsSupported(false);
       return;
     }
 
-    setIsSupported(true);
     const recognition = new SpeechRecognitionAPI();
     recognition.lang = "fr-FR"; // Reconnaissance en français
     recognition.continuous = false;

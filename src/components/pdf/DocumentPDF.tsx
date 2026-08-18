@@ -1,13 +1,6 @@
 /**
- * DocumentPDF — Template PDF partagé pour devis ET factures
- *
- * Utilise @react-pdf/renderer pour générer un PDF professionnel.
- * Un seul template pour les deux types de documents (devis/facture)
- * car leur structure visuelle est identique — seul le "type" change.
- *
- * ⚠️ Ce composant n'est PAS un composant React classique : il est rendu
- * par le moteur PDF (pas le DOM), donc pas de Tailwind ici — uniquement
- * le système StyleSheet.create() de react-pdf.
+ * DocumentPDF — Template PDF professionnel pour devis ET factures
+ * Design minimaliste "sans entête", haute lisibilité et conforme au modèle A4
  */
 
 import {
@@ -16,9 +9,8 @@ import {
   Text,
   View,
   StyleSheet,
-  Image,
 } from "@react-pdf/renderer";
-import { formatCurrencyPDF, formatDate } from "@/lib/utils";
+import { formatCurrencyPDF, formatDateNumeric } from "@/lib/utils";
 import type { Company, Client } from "@/types";
 
 // ── Type générique englobant devis et facture ─────────────────────────────────
@@ -35,6 +27,7 @@ export type PDFDocumentData = {
     quantity: number;
     unit_price: number;
     total: number;
+    description?: string;
   }>;
   subtotal: number;
   discount: number;
@@ -44,299 +37,395 @@ export type PDFDocumentData = {
   notes: string | null;
 };
 
-// ── Styles (équivalent CSS pour react-pdf) ─────────────────────────────────────
+// ── Styles react-pdf ──────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
+    paddingTop: 200,
+    paddingBottom: 70,
+    paddingHorizontal: 45,
     fontSize: 10,
     fontFamily: "Helvetica",
-    color: "#1f2937",
+    color: "#111111",
+    backgroundColor: "#ffffff",
   },
-  // En-tête : logo + infos entreprise à gauche, titre document à droite
-  header: {
+  // Bloc supérieur métadonnées (DATE / ÉCHÉANCE à gauche, DEVIS/FACTURE N° à droite)
+  metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 30,
-  },
-  companyBlock: {
-    maxWidth: 280,
-  },
-  logo: {
-    width: 50,
-    height: 50,
-    marginBottom: 8,
-    objectFit: "contain",
-  },
-  companyName: {
-    fontSize: 14,
-    fontWeight: 700,
-    marginBottom: 2,
-  },
-  companyDetail: {
-    fontSize: 9,
-    color: "#6b7280",
-    marginBottom: 1,
-  },
-  docTitleBlock: {
     alignItems: "flex-end",
+    marginBottom: 12,
   },
-  docTitle: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: "#2563eb",
-    marginBottom: 4,
+  metaLeft: {
+    width: "50%",
   },
-  docNumber: {
+  metaLeftText: {
     fontSize: 11,
-    color: "#374151",
-    marginBottom: 8,
+    fontWeight: "bold",
+    color: "#111111",
+    marginBottom: 3,
   },
-  docMeta: {
-    fontSize: 9,
-    color: "#6b7280",
+  metaRight: {
+    width: "50%",
     textAlign: "right",
   },
-  // Bloc client
-  clientSection: {
-    marginBottom: 24,
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#e5e7eb",
+  metaRightText: {
+    fontSize: 14,
+    fontWeight: "heavy",
+    color: "#111111",
+    textAlign: "right",
   },
-  clientLabel: {
-    fontSize: 8,
-    color: "#9ca3af",
-    marginBottom: 4,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+  // Ligne noire épaisse
+  thickLine: {
+    width: "100%",
+    height: 2.5,
+    backgroundColor: "#111111",
+    marginBottom: 16,
   },
-  clientName: {
+  // Section Parties (Client à gauche, Code à droite)
+  parties: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 18,
+  },
+  recipient: {
+    width: "60%",
+  },
+  codeSection: {
+    width: "40%",
+    textAlign: "right",
+    alignItems: "flex-end",
+  },
+  sectionTitle: {
     fontSize: 12,
-    fontWeight: 700,
-    marginBottom: 2,
+    fontWeight: "bold",
+    letterSpacing: 2,
+    marginBottom: 6,
+    color: "#111111",
   },
-  clientDetail: {
-    fontSize: 9,
-    color: "#6b7280",
+  partyName: {
+    fontSize: 12,
+    fontWeight: "bold",
+    marginBottom: 3,
+    color: "#111111",
   },
-  // Tableau des lignes
+  partyLine: {
+    fontSize: 10,
+    color: "#222222",
+    lineHeight: 1.4,
+    marginBottom: 1,
+  },
+  codeText: {
+    fontSize: 11,
+    fontWeight: "bold",
+    letterSpacing: 1.5,
+    textAlign: "right",
+  },
+  // Tableau des articles avec bordures noires et en-tête foncé
   table: {
-    marginBottom: 20,
+    width: "100%",
+    borderWidth: 1.5,
+    borderColor: "#111111",
+    marginBottom: 16,
   },
   tableHeader: {
     flexDirection: "row",
+    backgroundColor: "#1a1a1a",
     borderBottomWidth: 1.5,
-    borderColor: "#1f2937",
-    paddingBottom: 6,
-    marginBottom: 6,
+    borderColor: "#111111",
+  },
+  thText: {
+    fontSize: 10,
+    fontWeight: "bold",
+    color: "#ffffff",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    letterSpacing: 0.5,
   },
   tableRow: {
     flexDirection: "row",
-    paddingVertical: 6,
-    borderBottomWidth: 0.5,
-    borderColor: "#e5e7eb",
+    borderBottomWidth: 1,
+    borderColor: "#111111",
+    minHeight: 24,
+    alignItems: "center",
   },
-  colDesignation: { width: "45%" },
-  colQty: { width: "15%", textAlign: "right" },
-  colPrice: { width: "20%", textAlign: "right" },
-  colTotal: { width: "20%", textAlign: "right" },
-  thText: { fontSize: 8, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" },
-  tdText: { fontSize: 9.5, color: "#1f2937" },
-  // Totaux
-  totalsSection: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginBottom: 24,
+  tdText: {
+    fontSize: 10,
+    color: "#111111",
+    paddingVertical: 5,
+    paddingHorizontal: 8,
   },
-  totalsBlock: {
-    width: 220,
+  colDescription: {
+    width: "45%",
+    borderRightWidth: 1,
+    borderColor: "#111111",
   },
-  totalsRow: {
+  colPrice: {
+    width: "20%",
+    textAlign: "right",
+    borderRightWidth: 1,
+    borderColor: "#111111",
+  },
+  colQty: {
+    width: "15%",
+    textAlign: "right",
+    borderRightWidth: 1,
+    borderColor: "#111111",
+  },
+  colTotal: {
+    width: "20%",
+    textAlign: "right",
+  },
+  descriptionSubtext: {
+    fontSize: 8,
+    color: "#555555",
+    marginTop: 2,
+  },
+  // Section inférieure (Règlement à gauche, Totaux à droite)
+  bottomSection: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 4,
+    marginTop: 8,
   },
-  totalsLabel: { fontSize: 9.5, color: "#6b7280" },
-  totalsValue: { fontSize: 9.5, color: "#1f2937" },
+  paymentBlock: {
+    width: "48%",
+  },
+  paymentTitle: {
+    fontSize: 13,
+    fontWeight: "bold",
+    letterSpacing: 2,
+    marginBottom: 8,
+    color: "#111111",
+  },
+  paymentText: {
+    fontSize: 10,
+    lineHeight: 1.5,
+    color: "#222222",
+  },
+  totalsBox: {
+    width: "48%",
+    backgroundColor: "#2a2a2a",
+    padding: 12,
+    borderRadius: 3,
+  },
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 7,
+  },
+  totalLabel: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: "#ffffff",
+    letterSpacing: 0.5,
+  },
+  totalValue: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: "#ffffff",
+    textAlign: "right",
+  },
   grandTotalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingTop: 8,
-    marginTop: 4,
-    borderTopWidth: 1,
-    borderColor: "#1f2937",
-  },
-  grandTotalLabel: { fontSize: 11, fontWeight: 700, color: "#1f2937" },
-  grandTotalValue: { fontSize: 13, fontWeight: 700, color: "#2563eb" },
-  // Notes
-  notesSection: {
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  notesLabel: {
-    fontSize: 8,
-    color: "#9ca3af",
-    marginBottom: 4,
-    textTransform: "uppercase",
-  },
-  notesText: {
-    fontSize: 9,
-    color: "#4b5563",
-    lineHeight: 1.5,
-  },
-  // Pied de page
-  footer: {
-    position: "absolute",
-    bottom: 30,
-    left: 40,
-    right: 40,
-    textAlign: "center",
-    fontSize: 8,
-    color: "#9ca3af",
+    marginTop: 6,
+    paddingTop: 6,
     borderTopWidth: 0.5,
-    borderColor: "#e5e7eb",
-    paddingTop: 10,
+    borderColor: "rgba(255, 255, 255, 0.4)",
+  },
+  grandTotalLabel: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#ffffff",
+    letterSpacing: 0.5,
+  },
+  grandTotalValue: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#ffffff",
+    textAlign: "right",
+  },
+  // Signature directeur
+  directorSection: {
+    marginTop: 30,
+    alignItems: "flex-end",
+  },
+  directorLine: {
+    width: 170,
+    borderBottomWidth: 1.5,
+    borderColor: "#111111",
+    marginBottom: 4,
+  },
+  directorLabel: {
+    fontSize: 9,
+    fontWeight: "bold",
+    letterSpacing: 1,
+    color: "#111111",
+  },
+  // Notes et conditions
+  footerNote: {
+    marginTop: 20,
+    fontSize: 8.5,
+    color: "#444444",
+    lineHeight: 1.4,
   },
 });
 
-const DOC_TYPE_LABELS = {
-  quote: "DEVIS",
-  invoice: "FACTURE",
-};
-
 export function DocumentPDF({ data }: { data: PDFDocumentData }) {
+  const isQuote = data.type === "quote";
+  const docTitle = isQuote ? "DEVIS N° :" : "FACTURE N° :";
+  const emptyRowsCount = Math.max(0, 3 - data.items.length);
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* ── En-tête ──────────────────────────────────────────────────── */}
-        <View style={styles.header}>
-          <View style={styles.companyBlock}>
-            {data.company.logo_url && (
-              // eslint-disable-next-line jsx-a11y/alt-text
-              <Image src={data.company.logo_url} style={styles.logo} />
-            )}
-            <Text style={styles.companyName}>{data.company.name}</Text>
-            {data.company.address && (
-              <Text style={styles.companyDetail}>{data.company.address}</Text>
-            )}
-            {data.company.phone && (
-              <Text style={styles.companyDetail}>Tél : {data.company.phone}</Text>
-            )}
-            {data.company.email && (
-              <Text style={styles.companyDetail}>{data.company.email}</Text>
-            )}
-            {data.company.rccm && (
-              <Text style={styles.companyDetail}>RCCM : {data.company.rccm}</Text>
-            )}
-            {data.company.ifu && (
-              <Text style={styles.companyDetail}>IFU : {data.company.ifu}</Text>
-            )}
-            {data.company.cme && (
-              <Text style={styles.companyDetail}>CME : {data.company.cme}</Text>
-            )}
+        {/* ── MÉTADONNÉES SUPÉRIEURES (DATE / ÉCHÉANCE / N°) ─────────────── */}
+        <View style={styles.metaRow}>
+          <View style={styles.metaLeft}>
+            <Text style={styles.metaLeftText}>
+              DATE : {formatDateNumeric(data.date)}
+            </Text>
+            <Text style={styles.metaLeftText}>
+              ÉCHÉANCE : {formatDateNumeric(data.dueOrValidDate || data.date)}
+            </Text>
           </View>
 
-          <View style={styles.docTitleBlock}>
-            <Text style={styles.docTitle}>{DOC_TYPE_LABELS[data.type]}</Text>
-            <Text style={styles.docNumber}>N° {data.number}</Text>
-            <Text style={styles.docMeta}>Date d'émission : {formatDate(data.date)}</Text>
-            {data.dueOrValidDate && (
-              <Text style={styles.docMeta}>
-                {data.type === "quote" ? "Valide jusqu'au" : "Échéance"} :{" "}
-                {formatDate(data.dueOrValidDate)}
-              </Text>
-            )}
+          <View style={styles.metaRight}>
+            <Text style={styles.metaRightText}>
+              {docTitle} {data.number}
+            </Text>
           </View>
         </View>
 
-        {/* ── Bloc client ──────────────────────────────────────────────── */}
-        <View style={styles.clientSection}>
-          <Text style={styles.clientLabel}>
-            {data.type === "quote" ? "Devis adressé à" : "Facturé à"}
-          </Text>
-          <Text style={styles.clientName}>{data.client.name}</Text>
-          {data.client.address && (
-            <Text style={styles.clientDetail}>{data.client.address}</Text>
-          )}
-          {data.client.phone && (
-            <Text style={styles.clientDetail}>Tél : {data.client.phone}</Text>
-          )}
-          {data.client.email && (
-            <Text style={styles.clientDetail}>{data.client.email}</Text>
-          )}
+        {/* ── LIGNE ÉPAISSE SÉPARATRICE ─────────────────────────────────── */}
+        <View style={styles.thickLine} />
+
+        {/* ── SECTION CLIENT & CODE ─────────────────────────────────────── */}
+        <View style={styles.parties}>
+          <View style={styles.recipient}>
+            <Text style={styles.sectionTitle}>CLIENT :</Text>
+            <Text style={styles.partyName}>{data.client.name}</Text>
+            {data.client.email && (
+              <Text style={styles.partyLine}>{data.client.email}</Text>
+            )}
+            {data.client.phone && (
+              <Text style={styles.partyLine}>{data.client.phone}</Text>
+            )}
+            {data.client.address && (
+              <Text style={styles.partyLine}>{data.client.address}</Text>
+            )}
+          </View>
+
+          <View style={styles.codeSection}>
+            <Text style={styles.codeText}>
+              CODE : {data.client.code || data.client.ifu || "—"}
+            </Text>
+          </View>
         </View>
 
-        {/* ── Tableau des articles ─────────────────────────────────────── */}
+        {/* ── TABLEAU DES ARTICLES ──────────────────────────────────────── */}
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Text style={[styles.colDesignation, styles.thText]}>Désignation</Text>
-            <Text style={[styles.colQty, styles.thText]}>Qté</Text>
-            <Text style={[styles.colPrice, styles.thText]}>Prix unitaire</Text>
-            <Text style={[styles.colTotal, styles.thText]}>Total</Text>
+            <Text style={[styles.colDescription, styles.thText]}>Description :</Text>
+            <Text style={[styles.colPrice, styles.thText]}>Prix Unitaire :</Text>
+            <Text style={[styles.colQty, styles.thText]}>Quantité :</Text>
+            <Text style={[styles.colTotal, styles.thText]}>Total :</Text>
           </View>
 
           {data.items.map((item, index) => (
             <View key={index} style={styles.tableRow}>
-              <Text style={[styles.colDesignation, styles.tdText]}>{item.designation}</Text>
-              <Text style={[styles.colQty, styles.tdText]}>{item.quantity}</Text>
+              <View style={[styles.colDescription, { paddingVertical: 5, paddingHorizontal: 8 }]}>
+                <Text style={{ fontSize: 9.5, color: "#111111", fontWeight: "medium" }}>
+                  {item.designation}
+                </Text>
+                {item.description && (
+                  <Text style={styles.descriptionSubtext}>{item.description}</Text>
+                )}
+              </View>
               <Text style={[styles.colPrice, styles.tdText]}>
                 {formatCurrencyPDF(item.unit_price)}
               </Text>
+              <Text style={[styles.colQty, styles.tdText]}>{item.quantity}</Text>
               <Text style={[styles.colTotal, styles.tdText]}>
                 {formatCurrencyPDF(item.total)}
               </Text>
             </View>
           ))}
+
+          {/* Lignes vides pour compléter la mise en page si peu d'articles */}
+          {Array.from({ length: emptyRowsCount }).map((_, i) => (
+            <View key={`empty-${i}`} style={styles.tableRow}>
+              <Text style={[styles.colDescription, styles.tdText]}>-</Text>
+              <Text style={[styles.colPrice, styles.tdText]}>-</Text>
+              <Text style={[styles.colQty, styles.tdText]}>-</Text>
+              <Text style={[styles.colTotal, styles.tdText]}>-</Text>
+            </View>
+          ))}
         </View>
 
-        {/* ── Totaux ───────────────────────────────────────────────────── */}
-        <View style={styles.totalsSection}>
-          <View style={styles.totalsBlock}>
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>Sous-total</Text>
-              <Text style={styles.totalsValue}>{formatCurrencyPDF(data.subtotal)}</Text>
+        {/* ── SECTION INFÉRIEURE (RÈGLEMENT + TOTAUX) ────────────────────── */}
+        <View style={styles.bottomSection}>
+          <View style={styles.paymentBlock}>
+            <Text style={styles.paymentTitle}>RÈGLEMENT :</Text>
+            <View style={styles.paymentText}>
+              <Text style={{ marginBottom: 2 }}>Par virement bancaire :</Text>
+              <Text style={{ marginBottom: 2 }}>
+                Banque : {data.company.bank_name || "—"}
+              </Text>
+              <Text style={{ marginBottom: 2 }}>
+                Compte : {data.company.bank_account || data.company.iban || "—"}
+              </Text>
+              <Text style={{ marginBottom: 2 }}>
+                CME : {data.company.cme || data.company.rccm || data.company.ifu || "—"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.totalsBox}>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>TOTAL HT :</Text>
+              <Text style={styles.totalValue}>{formatCurrencyPDF(data.subtotal)}</Text>
             </View>
 
-            {data.discount > 0 && (
-              <View style={styles.totalsRow}>
-                <Text style={styles.totalsLabel}>Remise</Text>
-                <Text style={styles.totalsValue}>-{formatCurrencyPDF(data.discount)}</Text>
-              </View>
-            )}
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>TVA {data.taxRate || 0} % :</Text>
+              <Text style={styles.totalValue}>{formatCurrencyPDF(data.tax)}</Text>
+            </View>
 
-            {data.tax > 0 && (
-              <View style={styles.totalsRow}>
-                <Text style={styles.totalsLabel}>TVA ({data.taxRate}%)</Text>
-                <Text style={styles.totalsValue}>{formatCurrencyPDF(data.tax)}</Text>
-              </View>
-            )}
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>REMISE :</Text>
+              <Text style={styles.totalValue}>
+                {data.discount > 0 ? `-${formatCurrencyPDF(data.discount)}` : "-"}
+              </Text>
+            </View>
 
             <View style={styles.grandTotalRow}>
-              <Text style={styles.grandTotalLabel}>Total</Text>
+              <Text style={styles.grandTotalLabel}>TOTAL TTC :</Text>
               <Text style={styles.grandTotalValue}>{formatCurrencyPDF(data.total)}</Text>
             </View>
           </View>
         </View>
 
-        {/* ── Pied de page ─────────────────────────────────────────────── */}
-        <Text style={styles.footer}>
-          {/*data.company.name*/}
-          {data.company.rccm && ` — RCCM : ${data.company.rccm}`}
-          {data.company.ifu && ` — IFU : ${data.company.ifu}`}
-          {data.company.cme && ` — CME : ${data.company.cme}`}
-          {/* " — Document généré automatiquement par DevisIA" */}
-        </Text>
+        {/* ── SIGNATURE DU DIRECTEUR ────────────────────────────────────── */}
+        <View style={styles.directorSection}>
+          <View style={styles.directorLine} />
+          <Text style={styles.directorLabel}>DIRECTEUR (Signature et cachet)</Text>
+        </View>
 
-        {/* ── Notes ────────────────────────────────────────────────────── */}
-        {data.notes && (
-          <View style={styles.notesSection}>
-            <Text style={styles.notesLabel}>Notes</Text>
-            <Text style={styles.notesText}>{data.notes}</Text>
-          </View>
-        )}
+        {/* ── PIED DE PAGE & CONDITIONS ─────────────────────────────────── */}
+        {/*
+        <View style={styles.footerNote}>
+          <Text style={{ marginBottom: 3 }}>
+            En cas de retard de paiement, une indemnité de retard pourra être appliquée selon les conditions prévues.
+          </Text>
+          {data.notes ? (
+            <Text style={{ marginBottom: 3 }}>Notes : {data.notes}</Text>
+          ) : (
+            <Text style={{ marginBottom: 3 }}>
+              Conditions générales de vente consultables auprès de notre service commercial.
+            </Text>
+          )}
+        </View>
+        */}
       </Page>
     </Document>
   );

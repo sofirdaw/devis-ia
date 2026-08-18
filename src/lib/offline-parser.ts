@@ -144,7 +144,7 @@ function parseSingleItem(
   }
 
   // Ce qui reste est la désignation
-  let designation = cleanLine
+  const designation = cleanLine
     .replace(/^[:\-–=à]\s*/, "")
     .replace(/\s*(?:à|pour|fcfa|f|cfa|\$|€)\s*$/i, "")
     .trim();

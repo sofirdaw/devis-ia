@@ -11,12 +11,10 @@ import { useAuthStore } from "@/store/auth.store";
 import { createClient } from "@/lib/supabase/client";
 import {
   User,
-  Settings,
   LogOut,
   ChevronDown,
   Loader2,
 } from "lucide-react";
-import Image from "next/image";
 
 interface UserMenuProps {
   className?: string;
@@ -65,6 +63,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
   const avatarUrl =
     (user?.user_metadata?.avatar_url as string) ||
     (user?.user_metadata?.picture as string) ||
+    company?.logo_url ||
     null;
 
   const initials = fullName.slice(0, 2).toUpperCase();
@@ -90,12 +89,11 @@ export function UserMenu({ className }: UserMenuProps = {}) {
         {/* Avatar */}
         <div className="w-8 h-8 rounded-full overflow-hidden bg-primary-600 flex items-center justify-center text-xs font-bold text-white shrink-0 ring-2 ring-primary-200 group-hover:ring-primary-400 transition-all">
           {avatarUrl ? (
-            <Image
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
               src={avatarUrl}
               alt={fullName}
-              width={32}
-              height={32}
-              className="object-cover w-full h-full"
+              className="object-contain w-full h-full bg-white p-0.5"
             />
           ) : (
             <span>{initials}</span>
@@ -109,28 +107,30 @@ export function UserMenu({ className }: UserMenuProps = {}) {
 
         <ChevronDown
           size={14}
-          className={`text-gray-500 transition-transform duration-200 shrink-0 ${open ? "rotate-180" : ""
-            }`}
+          className={cn(
+            "text-gray-500 group-hover:text-gray-800 transition-transform duration-200",
+            open && "rotate-180"
+          )}
         />
       </button>
 
-      {/* Dropdown */}
+      {/* Menu déroulant */}
       {open && (
         <div
+          id="user-menu-dropdown"
           className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-64 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150"
           role="menu"
         >
           {/* En-tête profil */}
           <div className="px-4 py-3 bg-gradient-to-br from-primary-50 to-white border-b border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-600 flex items-center justify-center text-sm font-bold text-white shrink-0">
+              <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-600 flex items-center justify-center text-sm font-bold text-white shrink-0 border border-primary-200">
                 {avatarUrl ? (
-                  <Image
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
                     src={avatarUrl}
                     alt={fullName}
-                    width={40}
-                    height={40}
-                    className="object-cover w-full h-full"
+                    className="object-contain w-full h-full bg-white p-0.5"
                   />
                 ) : (
                   <span>{initials}</span>

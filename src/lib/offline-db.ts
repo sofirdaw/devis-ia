@@ -1,10 +1,10 @@
 /**
  * Moteur de base de données locale IndexedDB pour le mode 100% hors-ligne.
- * Permet de lire, créer, modifier et supprimer des devis/factures sans réseau.
+ * Permet de lire, créer, modifier et synchroniser des devis et factures sans réseau.
  */
 
 const DB_NAME = "DevisIA_OfflineDB";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export interface OfflineQuote {
   id: string;
@@ -27,10 +27,39 @@ export interface OfflineQuote {
   sync_status: "synced" | "pending_create" | "pending_update" | "pending_delete";
 }
 
+export interface OfflineInvoice {
+  id: string;
+  invoice_number: string;
+  client_name?: string;
+  client_id?: string;
+  status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
+  total: number;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  notes?: string;
+  due_date?: string;
+  created_at: string;
+  items: Array<{
+    designation: string;
+    quantity: number;
+    unit_price: number;
+    total: number;
+  }>;
+  sync_status: "synced" | "pending_create" | "pending_update" | "pending_delete";
+}
+
 export interface SyncQueueItem {
   id: string;
-  action: "CREATE_QUOTE" | "UPDATE_QUOTE" | "DELETE_QUOTE" | "CREATE_CLIENT";
-  payload: any;
+  action:
+    | "CREATE_QUOTE"
+    | "UPDATE_QUOTE"
+    | "DELETE_QUOTE"
+    | "CREATE_INVOICE"
+    | "UPDATE_INVOICE"
+    | "DELETE_INVOICE"
+    | "CREATE_CLIENT";
+  payload: Record<string, unknown>;
   created_at: string;
 }
 
@@ -51,7 +80,8 @@ function openDB(): Promise<IDBDatabase> {
       }
 
       if (!db.objectStoreNames.contains("invoices")) {
-        db.createObjectStore("invoices", { keyPath: "id" });
+        const invoiceStore = db.createObjectStore("invoices", { keyPath: "id" });
+        invoiceStore.createIndex("sync_status", "sync_status", { unique: false });
       }
 
       if (!db.objectStoreNames.contains("clients")) {
@@ -114,11 +144,54 @@ export async function deleteOfflineQuote(id: string): Promise<void> {
   });
 }
 
+// ── FACTURES ────────────────────────────────────────────────────────────────
+
+export async function getOfflineInvoices(): Promise<OfflineInvoice[]> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction("invoices", "readonly");
+      const store = transaction.objectStore("invoices");
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.error("Erreur lecture invoices IndexedDB:", err);
+    return [];
+  }
+}
+
+export async function saveOfflineInvoice(invoice: OfflineInvoice): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("invoices", "readwrite");
+    const store = transaction.objectStore("invoices");
+    const request = store.put(invoice);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteOfflineInvoice(id: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("invoices", "readwrite");
+    const store = transaction.objectStore("invoices");
+    const request = store.delete(id);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
 // ── FILE D'ATTENTE DE SYNCHRONISATION ────────────────────────────────────────
 
 export async function addToSyncQueue(
   action: SyncQueueItem["action"],
-  payload: any
+  payload: Record<string, unknown>
 ): Promise<string> {
   const db = await openDB();
   const item: SyncQueueItem = {

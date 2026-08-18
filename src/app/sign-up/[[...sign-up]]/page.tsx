@@ -12,7 +12,7 @@ export default function SignUpPage() {
 
   return (
     <div className="flex items-center justify-center min-h-screen text-gray-500 text-sm">
-      Redirection vers la page d'inscription...
+      Redirection vers la page d&apos;inscription...
     </div>
   );
 }

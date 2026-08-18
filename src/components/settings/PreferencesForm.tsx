@@ -30,12 +30,12 @@ const initialState: ActionResult = {};
 export function PreferencesForm({ company }: PreferencesFormProps) {
   const action = updateCompanyPreferencesAction.bind(null, company.id);
   const [state, formAction, isPending] = useActionState(action, initialState);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const showSuccess = Boolean(state.success && !dismissed);
 
   useEffect(() => {
     if (state.success) {
-      setShowSuccess(true);
-      const timer = setTimeout(() => setShowSuccess(false), 3000);
+      const timer = setTimeout(() => setDismissed(true), 3000);
       return () => clearTimeout(timer);
     }
   }, [state.success]);
@@ -50,8 +50,8 @@ export function PreferencesForm({ company }: PreferencesFormProps) {
         </CardDescription>
       </CardHeader>
 
-      <form action={formAction}>
-        <CardBody className="p-4 sm:p-6 lg:p-8 space-y-4">
+      <form action={formAction} onSubmit={() => setDismissed(false)} className="p-4 sm:p-6 lg:p-8 space-y-6">
+        <CardBody className="p-0 space-y-4">
           {state.error && (
             <div
               className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm"

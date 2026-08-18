@@ -139,7 +139,7 @@ export function AIGeneratorPanel({
             </p>
             {!result.matchedClientId && (
               <p className="text-xs text-green-700 mt-1">
-                Client "{result.clientName}" introuvable — veuillez le
+                Client &quot;{result.clientName}&quot; introuvable — veuillez le
                 sélectionner ou le créer manuellement.
               </p>
             )}

@@ -1,5 +1,5 @@
 /**
- * Page Liste des Factures — Server Component
+ * Page Liste des Factures — Server Component résilient hors-ligne
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -13,31 +13,36 @@ import { Button } from "@/components/ui/button";
 
 export default async function InvoicesPage() {
   const company = await requireCurrentCompany();
-  const supabase = await createClient();
+  let invoicesWithReceivable: Invoice[] = [];
 
-  const { data: invoices } = await supabase
-    .from("invoices")
-    .select("*, client:clients(*)")
-    .eq("company_id", company.id)
-    .order("created_at", { ascending: false });
+  try {
+    const supabase = await createClient();
+    const { data: invoices } = await supabase
+      .from("invoices")
+      .select("*, client:clients(*)")
+      .eq("company_id", company.id)
+      .order("created_at", { ascending: false });
 
-  const invoiceIds = (invoices ?? []).map((i) => i.id);
+    const invoiceIds = (invoices ?? []).map((i) => i.id);
 
-  const { data: receivables } = invoiceIds.length
-    ? await supabase
-        .from("receivables")
-        .select("id, invoice_id, paid_amount, remaining_amount, status")
-        .in("invoice_id", invoiceIds)
-    : { data: [] };
+    const { data: receivables } = invoiceIds.length
+      ? await supabase
+          .from("receivables")
+          .select("id, invoice_id, paid_amount, remaining_amount, status")
+          .in("invoice_id", invoiceIds)
+      : { data: [] };
 
-  const receivableByInvoiceId = new Map(
-    (receivables ?? []).map((r) => [r.invoice_id, r]),
-  );
+    const receivableByInvoiceId = new Map(
+      (receivables ?? []).map((r) => [r.invoice_id, r])
+    );
 
-  const invoicesWithReceivable = (invoices ?? []).map((invoice) => ({
-    ...invoice,
-    receivable: receivableByInvoiceId.get(invoice.id) ?? null,
-  }));
+    invoicesWithReceivable = (invoices ?? []).map((invoice) => ({
+      ...invoice,
+      receivable: receivableByInvoiceId.get(invoice.id) ?? null,
+    })) as Invoice[];
+  } catch {
+    // Mode hors-ligne
+  }
 
   return (
     <>
@@ -58,7 +63,7 @@ export default async function InvoicesPage() {
         }
       />
       <div className="page-container">
-        <InvoicesTable invoices={invoicesWithReceivable as Invoice[]} />
+        <InvoicesTable invoices={invoicesWithReceivable} />
       </div>
     </>
   );

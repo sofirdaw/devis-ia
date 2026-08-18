@@ -59,7 +59,7 @@ export default async function InvoiceDetailPage({
                 Retour
               </Button>
             </Link>
-            <PrintButton />
+            <PrintButton pdfUrl={`/api/pdf/invoice/${typedInvoice.id}`} />
             <DownloadPdfButton type="invoice" documentId={typedInvoice.id} />
             <InvoiceDetailActions
               invoiceId={typedInvoice.id}

@@ -10,12 +10,12 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { setUser, setCompany, setLoading } = useAuthStore();
-
   useEffect(() => {
     const supabase = createClient();
 
     const loadUserAndCompany = async () => {
+      // Accès aux setters via getState() pour éviter les dépendances réactives
+      const { setUser, setCompany, setLoading } = useAuthStore.getState();
       setLoading(true);
 
       try {
@@ -25,9 +25,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         } = await supabase.auth.getUser();
 
         if (userError || !user) {
-          setUser(null);
-          setCompany(null);
-          setLoading(false);
+          useAuthStore.getState().setUser(null);
+          useAuthStore.getState().setCompany(null);
+          useAuthStore.getState().setLoading(false);
           return;
         }
 
@@ -47,10 +47,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         }
       } catch (error) {
         console.error("Erreur chargement utilisateur:", error);
-        setUser(null);
-        setCompany(null);
+        useAuthStore.getState().setUser(null);
+        useAuthStore.getState().setCompany(null);
       } finally {
-        setLoading(false);
+        useAuthStore.getState().setLoading(false);
       }
     };
 
@@ -60,17 +60,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        setUser(session.user);
+        useAuthStore.getState().setUser(session.user);
       } else {
-        setUser(null);
-        setCompany(null);
+        useAuthStore.getState().setUser(null);
+        useAuthStore.getState().setCompany(null);
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [setUser, setCompany, setLoading]);
+  }, []); // Exécuté une seule fois au montage
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-x-hidden">

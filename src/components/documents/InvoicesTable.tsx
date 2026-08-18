@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Receipt,
@@ -14,13 +14,13 @@ import {
   Search,
   CheckCircle,
   Clock,
-  DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import type { Invoice, InvoiceStatus } from "@/types";
+import { getOfflineInvoices, type OfflineInvoice } from "@/lib/offline-db";
+import type { Invoice, InvoiceStatus, Client } from "@/types";
 
 interface InvoicesTableProps {
   invoices: Invoice[];
@@ -39,28 +39,66 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
     "all",
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [offlineInvoices, setOfflineInvoices] = useState<OfflineInvoice[]>([]);
 
-  // KPIs — basés sur les montants réellement encaissés via les créances
-  // (paiements partiels compris), avec repli sur le total de la facture
-  // quand aucune créance n'est liée.
+  useEffect(() => {
+    async function loadOffline() {
+      const offline = await getOfflineInvoices();
+      setOfflineInvoices(offline);
+    }
+    loadOffline();
+
+    const handleSyncComplete = () => {
+      loadOffline();
+    };
+
+    window.addEventListener("pwa-sync-complete", handleSyncComplete);
+    return () => window.removeEventListener("pwa-sync-complete", handleSyncComplete);
+  }, []);
+
+  const combinedInvoices = useMemo(() => {
+    const formattedOffline: Invoice[] = offlineInvoices
+      .filter((off) => off.sync_status === "pending_create")
+      .map((off) => ({
+        id: off.id,
+        invoice_number: `${off.invoice_number} (Local 🟡)`,
+        client: { name: off.client_name || "Client Local" } as unknown as Client,
+        company_id: "offline_company",
+        client_id: off.client_id || "",
+        status: off.status,
+        total: off.total,
+        subtotal: off.subtotal,
+        tax: off.tax,
+        discount: off.discount,
+        notes: off.notes || "",
+        due_date: off.due_date || null,
+        paid_at: null,
+        created_at: off.created_at,
+        receivable: null,
+        is_offline: true,
+      } as unknown as Invoice));
+    return [...formattedOffline, ...invoices];
+  }, [invoices, offlineInvoices]);
+
+  // KPIs
   const kpis = useMemo(() => {
-    const totalCount = invoices.length;
+    const totalCount = combinedInvoices.length;
 
-    const paidAmount = invoices.reduce((sum, i) => {
+    const paidAmount = combinedInvoices.reduce((sum, i) => {
       if (i.receivable) return sum + Number(i.receivable.paid_amount);
       return sum + (i.status === "paid" ? Number(i.total) : 0);
     }, 0);
 
-    const unpaidAmount = invoices.reduce((sum, i) => {
+    const unpaidAmount = combinedInvoices.reduce((sum, i) => {
       if (i.receivable) return sum + Number(i.receivable.remaining_amount);
       return sum + (i.status === "paid" ? 0 : Number(i.total));
     }, 0);
 
     return { totalCount, paidAmount, unpaidAmount };
-  }, [invoices]);
+  }, [combinedInvoices]);
 
   const filteredInvoices = useMemo(() => {
-    return invoices.filter((i) => {
+    return combinedInvoices.filter((i) => {
       const matchesStatus = statusFilter === "all" || i.status === statusFilter;
       const matchesSearch =
         i.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -69,7 +107,7 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
           .includes(searchQuery.toLowerCase());
       return matchesStatus && matchesSearch;
     });
-  }, [invoices, statusFilter, searchQuery]);
+  }, [combinedInvoices, statusFilter, searchQuery]);
 
   return (
     <div className="space-y-6">
@@ -155,7 +193,7 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
               size="sm"
               leftIcon={<Sparkles size={14} className="text-blue-600" />}
             >
-              Générer avec l'IA
+              Générer avec l&apos;IA
             </Button>
           </Link>
           <Link href="/invoices/new">
@@ -173,7 +211,7 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
             Aucune facture trouvée
           </p>
           <p className="text-gray-400 text-xs mt-1">
-            Essayez d'ajuster vos critères de recherche ou de filtre
+            Essayez d&apos;ajuster vos critères de recherche ou de filtre
           </p>
         </div>
       ) : (

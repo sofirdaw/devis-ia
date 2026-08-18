@@ -1,8 +1,5 @@
 /**
- * Page Clients — Server Component
- *
- * Récupère la liste des clients côté serveur (rapide, SEO-friendly)
- * puis délègue l'interactivité (recherche, modales) au composant client ClientsTable.
+ * Page Clients — Server Component résilient hors-ligne
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -16,20 +13,25 @@ import { Button } from "@/components/ui/button";
 
 export default async function ClientsPage() {
   const company = await requireCurrentCompany();
-  const supabase = await createClient();
+  let clients: Client[] = [];
 
-  // Récupérer tous les clients de cette entreprise, triés par date d'ajout
-  const { data: clients } = await supabase
-    .from("clients")
-    .select("*")
-    .eq("company_id", company.id)
-    .order("created_at", { ascending: false });
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("clients")
+      .select("*")
+      .eq("company_id", company.id)
+      .order("created_at", { ascending: false });
+    if (data) clients = data as Client[];
+  } catch {
+    // Mode hors-ligne
+  }
 
   return (
     <>
       <Header
         title="Clients"
-        description={`${clients?.length ?? 0} client${(clients?.length ?? 0) > 1 ? "s" : ""} enregistré${(clients?.length ?? 0) > 1 ? "s" : ""}`}
+        description={`${clients.length} client${clients.length > 1 ? "s" : ""} enregistré${clients.length > 1 ? "s" : ""}`}
         actions={
           <Link href="/dashboard">
             <Button
@@ -44,7 +46,7 @@ export default async function ClientsPage() {
         }
       />
       <div className="page-container">
-        <ClientsTable initialClients={(clients as Client[]) ?? []} />
+        <ClientsTable initialClients={clients} />
       </div>
     </>
   );

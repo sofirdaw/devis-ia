@@ -238,7 +238,7 @@ export async function updateCompanyPreferencesAction(
 export async function uploadCompanyLogoAction(
   companyId: string,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<ActionResult & { logoUrl?: string }> {
   const file = formData.get("logo") as File | null;
 
   if (!file || file.size === 0) {
@@ -285,5 +285,6 @@ export async function uploadCompanyLogoAction(
   }
 
   revalidatePath("/settings");
-  return { success: true };
+  revalidatePath("/dashboard");
+  return { success: true, logoUrl };
 }

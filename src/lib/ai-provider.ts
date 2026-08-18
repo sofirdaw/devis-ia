@@ -11,6 +11,7 @@
  */
 
 import OpenAI from "openai";
+import type { ChatCompletionContentPart } from "openai/resources/chat/completions";
 
 export type AIExtractionPayload = {
   client_name: string;
@@ -56,19 +57,45 @@ function getApiKeys(envVarName: string): string[] {
 function getVisionTargets(): ProviderTarget[] {
   const targets: ProviderTarget[] = [];
 
-  // 1. OpenRouter Vision (Modèle Gemini 2.5 Flash très performant & économique)
-  const openRouterKeys = getApiKeys("OPENROUTER_API_KEY");
-  openRouterKeys.forEach((key, idx) => {
+  // 1. Groq Vision (Ultra-rapide, gratuit & excellent pour l'OCR)
+  const groqKeys = getApiKeys("GROQ_API_KEY");
+  groqKeys.forEach((key, idx) => {
     targets.push({
-      name: `OpenRouter Gemini 2.5 Flash (Clé ${idx + 1})`,
-      baseURL: "https://openrouter.ai/api/v1",
+      name: `Groq Llama 3.2 11B Vision (Clé ${idx + 1})`,
+      baseURL: "https://api.groq.com/openai/v1",
       apiKey: key,
-      model: "google/gemini-2.5-flash",
+      model: "llama-3.2-11b-vision-preview",
+      isVision: true,
+    });
+    targets.push({
+      name: `Groq Llama 3.2 90B Vision (Clé ${idx + 1})`,
+      baseURL: "https://api.groq.com/openai/v1",
+      apiKey: key,
+      model: "llama-3.2-90b-vision-preview",
       isVision: true,
     });
   });
 
-  // 2. Mistral AI Pixtral & Small (Ultra-fiable pour OCR)
+  // 2. OpenRouter Vision (Gemini 2.0 Flash & GPT-4o-mini)
+  const openRouterKeys = getApiKeys("OPENROUTER_API_KEY");
+  openRouterKeys.forEach((key, idx) => {
+    targets.push({
+      name: `OpenRouter Gemini 2.0 Flash (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "google/gemini-2.0-flash-001",
+      isVision: true,
+    });
+    targets.push({
+      name: `OpenRouter GPT-4o Mini Vision (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "openai/gpt-4o-mini",
+      isVision: true,
+    });
+  });
+
+  // 3. Mistral AI Pixtral & Small (Spécialiste OCR & manuscrit)
   const mistralKeys = getApiKeys("MISTRAL_API_KEY");
   mistralKeys.forEach((key, idx) => {
     targets.push({
@@ -78,16 +105,9 @@ function getVisionTargets(): ProviderTarget[] {
       model: "pixtral-12b-2409",
       isVision: true,
     });
-    targets.push({
-      name: `Mistral Small Vision (Clé ${idx + 1})`,
-      baseURL: "https://api.mistral.ai/v1",
-      apiKey: key,
-      model: "mistral-small-latest",
-      isVision: true,
-    });
   });
 
-  // 3. Google Gemini Direct (via GEMINI_API_KEY)
+  // 4. Google Gemini Direct (via GEMINI_API_KEY)
   const geminiKeys = getApiKeys("GEMINI_API_KEY").concat(getApiKeys("GOOGLE_GENERATIVE_AI_API_KEY"));
   geminiKeys.forEach((key, idx) => {
     targets.push({
@@ -106,7 +126,7 @@ function getVisionTargets(): ProviderTarget[] {
     });
   });
 
-  // 4. OpenAI Vision (Fallback payant via OPENAI_API_KEY)
+  // 5. OpenAI Vision (gpt-4o-mini)
   const openAiKeys = getApiKeys("OPENAI_API_KEY");
   openAiKeys.forEach((key, idx) => {
     targets.push({
@@ -201,7 +221,7 @@ function getTextTargets(): ProviderTarget[] {
 async function executeWithWaterfall(
   targets: ProviderTarget[],
   systemPrompt: string,
-  userMessageContent: string | Array<unknown>
+  userMessageContent: OpenAI.Chat.Completions.ChatCompletionUserMessageParam["content"]
 ): Promise<AIFallbackResponse> {
   if (targets.length === 0) {
     return {
@@ -224,7 +244,7 @@ async function executeWithWaterfall(
 
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userMessageContent as any },
+        { role: "user", content: userMessageContent },
       ];
 
       const completionParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
@@ -310,20 +330,28 @@ export async function extractDocumentFromImageWithFallback(
   systemPrompt: string
 ): Promise<AIFallbackResponse> {
   const targets = getVisionTargets();
-  const userContent = [
+  const todayDate = new Date().toISOString().split("T")[0];
+  const userContent: ChatCompletionContentPart[] = [
     {
       type: "text",
-      text: `Cette image montre une facture, un devis papier ou une note manuscrite.
-Extrais le nom du client (s'il est visible), toutes les lignes d'articles avec leurs quantités et prix, et génère des notes pertinentes.
-Utilise la date d'aujourd'hui comme date du document.
-Réponds UNIQUEMENT avec ce format JSON exact, sans aucun texte autour :
+      text: `Tu es un expert en reconnaissance d'écriture manuscrite (OCR manuscrit) et en analyse de documents commerciaux (devis, factures, reçus, carnets de notes, bons de commande manuscrits ou imprimés).
+Analyse minutieusement cette image (même si elle est écrite à la main, froissée, penchée ou prise en photo avec un smartphone) et extrais :
+1. "client_name" : le nom du client (particulier ou entreprise), ou chaîne vide si absent.
+2. "items" : la liste de tous les articles/prestations trouvés :
+   - "designation" : nom clair du produit ou service (déchiffre l'écriture manuscrite avec soin).
+   - "quantity" : quantité numérique (1 par défaut si non spécifié).
+   - "unit_price" : prix unitaire numérique (sans symbole monétaire).
+3. "notes" : notes explicatives ou conditions particulières visibles.
+4. "date" : date au format YYYY-MM-DD (ou "${todayDate}" si absente).
+
+Réponds STRICTEMENT avec ce format JSON valide, sans aucun texte autour :
 {
-  "client_name": "nom du client ou chaîne vide si non visible",
+  "client_name": "nom du client",
   "items": [
-    { "designation": "nom du produit", "quantity": nombre, "unit_price": nombre }
+    { "designation": "nom de l'article ou service", "quantity": 1, "unit_price": 10000 }
   ],
-  "notes": "notes professionnelles pertinentes",
-  "date": "YYYY-MM-DD"
+  "notes": "notes ou conditions",
+  "date": "${todayDate}"
 }`,
     },
     {
@@ -331,6 +359,7 @@ Réponds UNIQUEMENT avec ce format JSON exact, sans aucun texte autour :
       image_url: { url: imageBase64 },
     },
   ];
+
 
   return executeWithWaterfall(targets, systemPrompt, userContent);
 }

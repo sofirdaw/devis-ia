@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginAction } from "@/app/actions/auth";
@@ -11,14 +11,10 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
+  const [error, setError] = useState(() => {
     const errorParam = searchParams.get("error");
-    if (errorParam) {
-      setError(decodeURIComponent(errorParam));
-    }
-  }, [searchParams]);
+    return errorParam ? decodeURIComponent(errorParam) : "";
+  });
 
   const handleGoogleLogin = async () => {
     try {
@@ -161,14 +157,14 @@ function LoginForm() {
         <button
           type="submit"
           disabled={loading || googleLoading}
-          className="w-full py-3 px-4 bg-primary-600 text-black font-medium rounded-lg text-sm hover:bg-primary-700 transition-colors disabled:opacity-50 shadow-sm"
+          className="w-full py-3 px-4 bg-primary-600 text-white font-medium rounded-lg text-sm hover:bg-primary-700 transition-colors disabled:opacity-50 shadow-sm"
         >
           {loading ? "Connexion en cours..." : "Se connecter"}
         </button>
       </form>
 
       <div className="mt-6 text-center text-sm text-gray-500">
-        Vous n'avez pas de compte ?{" "}
+        Vous n&apos;avez pas de compte ?{" "}
         <Link
           href="/register"
           className="font-medium text-primary-600 hover:text-primary-500"

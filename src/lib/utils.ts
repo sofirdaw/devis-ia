@@ -55,6 +55,20 @@ export function formatDate(dateString: string): string {
 }
 
 /**
+ * Formate une date ISO en format numérique DD/MM/YYYY pour le PDF
+ * @example formatDateNumeric("2026-08-17") → "17/08/2026"
+ */
+export function formatDateNumeric(dateString?: string | null): string {
+  if (!dateString) return "-";
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return "-";
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+/**
  * Génère un numéro de document unique
  * @example generateDocNumber("DEV") → "DEV-2026-001"
  */

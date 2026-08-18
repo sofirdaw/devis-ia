@@ -36,21 +36,12 @@ export function ProductFormDialog({
 }: ProductFormDialogProps) {
   const isEditMode = !!product;
 
-  const [supplierList, setSupplierList] = useState<Array<{ id: string; name: string }>>(
-    initialSuppliers
-  );
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string>(
-    product?.supplier_id ?? ""
-  );
+  const [extraSuppliers, setExtraSuppliers] = useState<Array<{ id: string; name: string }>>([]);
+  const [customSupplierId, setCustomSupplierId] = useState<string | null>(null);
   const [quickSupplierOpen, setQuickSupplierOpen] = useState(false);
 
-  useEffect(() => {
-    setSupplierList(initialSuppliers);
-  }, [initialSuppliers]);
-
-  useEffect(() => {
-    setSelectedSupplierId(product?.supplier_id ?? "");
-  }, [product]);
+  const selectedSupplierId = customSupplierId ?? product?.supplier_id ?? "";
+  const supplierList = [...initialSuppliers, ...extraSuppliers];
 
   const action = isEditMode
     ? updateProductAction.bind(null, product.id)
@@ -63,8 +54,8 @@ export function ProductFormDialog({
   }, [state.success, onOpenChange]);
 
   const handleSupplierCreated = (newSupplier: { id: string; name: string }) => {
-    setSupplierList((prev) => [...prev, newSupplier]);
-    setSelectedSupplierId(newSupplier.id);
+    setExtraSuppliers((prev) => [...prev, newSupplier]);
+    setCustomSupplierId(newSupplier.id);
   };
 
   const supplierOptions = supplierList.map((s) => ({
@@ -125,7 +116,7 @@ export function ProductFormDialog({
                 placeholder="Sélectionner un fournisseur"
                 options={supplierOptions}
                 value={selectedSupplierId}
-                onChange={(e) => setSelectedSupplierId(e.target.value)}
+                onChange={(e) => setCustomSupplierId(e.target.value)}
                 required
               />
             </div>

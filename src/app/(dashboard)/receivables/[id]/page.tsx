@@ -11,10 +11,9 @@ import { Header } from "@/components/layout";
 import { PaymentForm } from "@/components/receivables/PaymentForm";
 import { DeletePaymentButton } from "@/components/receivables/DeletePaymentButton";
 import { Badge } from "@/components/ui/badge";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowLeft, Calendar, FileText, DollarSign, User } from "lucide-react";
 import Link from "next/link";
-import type { Receivable, PaymentTransaction } from "@/types";
 
 const statusConfig = {
   pending: { label: "En attente", color: "bg-yellow-100 text-yellow-700" },
@@ -114,7 +113,7 @@ export default async function ReceivableDetailPage({
 
               <div>
                 <p className="text-xs text-gray-500 mb-1 lg:mb-2 uppercase tracking-wider">
-                  Date d'échéance
+                  Date d&apos;échéance
                 </p>
                 {receivable.due_date ? (
                   <div className="flex items-center gap-2">

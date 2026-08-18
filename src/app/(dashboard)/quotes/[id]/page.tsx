@@ -54,7 +54,7 @@ export default async function QuoteDetailPage({
                 Retour
               </Button>
             </Link>
-            <PrintButton />
+            <PrintButton pdfUrl={`/api/pdf/quote/${typedQuote.id}`} />
             <DownloadPdfButton type="quote" documentId={typedQuote.id} />
             <QuoteDetailActions
               quoteId={typedQuote.id}
@@ -75,7 +75,7 @@ export default async function QuoteDetailPage({
             <div className="text-right text-sm text-gray-500">
               <p>Créé le {formatDate(typedQuote.created_at)}</p>
               {typedQuote.valid_until && (
-                <p>Valide jusqu'au {formatDate(typedQuote.valid_until)}</p>
+                <p>Valide jusqu&apos;au {formatDate(typedQuote.valid_until)}</p>
               )}
             </div>
           </div>

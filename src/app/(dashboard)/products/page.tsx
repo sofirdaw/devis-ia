@@ -1,5 +1,5 @@
 /**
- * Page Produits — Server Component
+ * Page Produits — Server Component résilient hors-ligne
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -13,26 +13,39 @@ import { Button } from "@/components/ui/button";
 
 export default async function ProductsPage() {
   const company = await requireCurrentCompany();
-  const supabase = await createClient();
+  let products: Product[] = [];
+  let suppliers: Supplier[] = [];
 
-  const [{ data: products }, { data: suppliers }] = await Promise.all([
-    supabase
-      .from("products")
-      .select("*, supplier:suppliers(*)")
-      .eq("company_id", company.id)
-      .order("name"),
-    supabase
-      .from("suppliers")
-      .select("*")
-      .eq("company_id", company.id)
-      .order("name"),
-  ]);
+  try {
+    const supabase = await createClient();
+    const [prodRes, suppRes] = await Promise.allSettled([
+      supabase
+        .from("products")
+        .select("*, supplier:suppliers(*)")
+        .eq("company_id", company.id)
+        .order("name"),
+      supabase
+        .from("suppliers")
+        .select("*")
+        .eq("company_id", company.id)
+        .order("name"),
+    ]);
+
+    if (prodRes.status === "fulfilled" && prodRes.value.data) {
+      products = prodRes.value.data as Product[];
+    }
+    if (suppRes.status === "fulfilled" && suppRes.value.data) {
+      suppliers = suppRes.value.data as Supplier[];
+    }
+  } catch {
+    // Mode hors-ligne
+  }
 
   return (
     <>
       <Header
         title="Produits & Services"
-        description={`${products?.length ?? 0} produit${(products?.length ?? 0) > 1 ? "s" : ""} dans le catalogue`}
+        description={`${products.length} produit${products.length > 1 ? "s" : ""} dans le catalogue`}
         actions={
           <Link href="/dashboard">
             <Button
@@ -48,8 +61,8 @@ export default async function ProductsPage() {
       />
       <div className="page-container">
         <ProductsTable
-          initialProducts={(products as Product[]) ?? []}
-          suppliers={(suppliers as Supplier[]) ?? []}
+          initialProducts={products}
+          suppliers={suppliers}
         />
       </div>
     </>

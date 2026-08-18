@@ -220,7 +220,10 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       ),
       monthlyRevenue,
     };
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error && typeof error === "object" && "digest" in error) {
+      throw error;
+    }
     console.error("Erreur lors de la récupération des stats du dashboard:", error);
     return emptyStats;
   }

@@ -1,6 +1,5 @@
 /**
- * Page Nouveau Devis — Server Component qui charge les données
- * puis délègue le formulaire interactif à QuoteForm
+ * Page Nouveau Devis — Server Component sécurisé pour le mode hors-ligne
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -14,21 +13,34 @@ import { Button } from "@/components/ui/button";
 
 export default async function NewQuotePage() {
   const company = await requireCurrentCompany();
-  const supabase = await createClient();
 
-  // Charger clients et produits en parallèle pour le formulaire
-  const [{ data: clients }, { data: products }] = await Promise.all([
-    supabase
-      .from("clients")
-      .select("*")
-      .eq("company_id", company.id)
-      .order("name"),
-    supabase
-      .from("products")
-      .select("*")
-      .eq("company_id", company.id)
-      .order("name"),
-  ]);
+  let clients: Client[] = [];
+  let products: Product[] = [];
+
+  try {
+    const supabase = await createClient();
+    const [clientsRes, productsRes] = await Promise.allSettled([
+      supabase
+        .from("clients")
+        .select("*")
+        .eq("company_id", company.id)
+        .order("name"),
+      supabase
+        .from("products")
+        .select("*")
+        .eq("company_id", company.id)
+        .order("name"),
+    ]);
+
+    if (clientsRes.status === "fulfilled" && clientsRes.value.data) {
+      clients = clientsRes.value.data as Client[];
+    }
+    if (productsRes.status === "fulfilled" && productsRes.value.data) {
+      products = productsRes.value.data as Product[];
+    }
+  } catch {
+    console.warn("Mode hors-ligne : utilisation des listes vides pour nouveau devis");
+  }
 
   return (
     <>
@@ -50,8 +62,8 @@ export default async function NewQuotePage() {
       />
       <div className="page-container">
         <QuoteForm
-          clients={(clients as Client[]) ?? []}
-          products={(products as Product[]) ?? []}
+          clients={clients}
+          products={products}
           taxRate={company?.tax_rate ?? 0}
           defaultNotes={company?.default_quote_notes ?? ""}
         />

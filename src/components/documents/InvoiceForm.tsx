@@ -1,11 +1,12 @@
 /**
  * InvoiceForm — Formulaire de création de facture
- * Identique à QuoteForm mais avec due_date au lieu de valid_until
+ * Avec prise en charge 100% Hors-Ligne (IndexedDB)
  */
 
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState, useActionState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { LineItemsEditor, type LineItem } from "./LineItemsEditor";
 import { TotalsSummary } from "./TotalsSummary";
 import { createInvoiceAction } from "@/app/actions/invoices";
+import { saveOfflineInvoice, addToSyncQueue } from "@/lib/offline-db";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Client, Product } from "@/types";
 
@@ -40,6 +42,7 @@ export function InvoiceForm({
   initialDate,
   defaultNotes,
 }: InvoiceFormProps) {
+  const router = useRouter();
   const [items, setItems] = useState<LineItem[]>(
     initialItems?.length
       ? initialItems
@@ -47,13 +50,80 @@ export function InvoiceForm({
   );
   const [discount, setDiscount] = useState(0);
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(initialClientId);
+  const [isSavingOffline, setIsSavingOffline] = useState(false);
   const [state, formAction, isPending] = useActionState(createInvoiceAction, initialState);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const clientOptions = clients.map((c) => ({ value: c.id, label: c.name }));
   const selectedClient = clients.find((c) => c.id === selectedClientId);
 
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    if (typeof window !== "undefined" && !navigator.onLine) {
+      e.preventDefault();
+      setIsSavingOffline(true);
+
+      const localId = `off_fac_${Date.now()}`;
+      const invoiceNum = `FAC-OFF-${Math.floor(100 + Math.random() * 900)}`;
+
+      const subtotal = items.reduce(
+        (acc, item) => acc + (item.quantity || 0) * (item.unit_price || 0),
+        0
+      );
+      const tax = (subtotal - discount) * (taxRate / 100);
+      const total = subtotal - discount + tax;
+
+      const notesInput = formRef.current?.querySelector('[name="notes"]') as HTMLTextAreaElement;
+      const dueDateInput = formRef.current?.querySelector('[name="due_date"]') as HTMLInputElement;
+
+      const offlineInvoice = {
+        id: localId,
+        invoice_number: invoiceNum,
+        client_name: selectedClient?.name || "Client Local",
+        client_id: selectedClientId,
+        status: "draft" as const,
+        total,
+        subtotal,
+        tax,
+        discount,
+        notes: notesInput?.value || defaultNotes || "",
+        due_date: dueDateInput?.value || initialDate || "",
+        created_at: new Date().toISOString(),
+        items: items.map((i) => ({
+          designation: i.designation,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          total: i.quantity * i.unit_price,
+        })),
+        sync_status: "pending_create" as const,
+      };
+
+      try {
+        await saveOfflineInvoice(offlineInvoice);
+        await addToSyncQueue("CREATE_INVOICE", {
+          client_id: selectedClientId,
+          discount,
+          due_date: dueDateInput?.value || initialDate || "",
+          notes: notesInput?.value || defaultNotes || "",
+          items: items.map((i) => ({
+            product_id: i.product_id,
+            designation: i.designation,
+            quantity: i.quantity,
+            unit_price: i.unit_price,
+          })),
+          local_invoice: offlineInvoice,
+        });
+
+        router.push("/invoices");
+      } catch (err) {
+        console.error("Erreur sauvegarde facture hors-ligne:", err);
+      } finally {
+        setIsSavingOffline(false);
+      }
+    }
+  };
+
   return (
-    <form action={formAction} className="space-y-6">
+    <form ref={formRef} action={formAction} onSubmit={handleSubmit} className="space-y-6">
       {state.error && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm" role="alert">
           {state.error}
@@ -131,8 +201,8 @@ export function InvoiceForm({
         </div>
 
         <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 lg:pt-6 border-t border-gray-100 mt-6 lg:mt-8">
-          <Button type="submit" size="lg" isLoading={isPending} className="w-full sm:w-auto px-8 lg:px-10 shadow-lg">
-            {isPending ? "Création..." : "Créer la facture"}
+          <Button type="submit" size="lg" isLoading={isPending || isSavingOffline} className="w-full sm:w-auto px-8 lg:px-10 shadow-lg">
+            {isPending || isSavingOffline ? "Création..." : "Créer la facture"}
           </Button>
         </div>
       </div>

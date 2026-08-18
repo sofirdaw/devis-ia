@@ -95,7 +95,7 @@ export default function RegisterPage() {
                   d="M12 6.26c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.84 3.29 14.63 2.4 12 2.4a9.74 9.74 0 0 0-8.7 5.38l3.24 2.51C6.31 7.98 8.46 6.26 12 6.26Z"
                 />
               </svg>
-              S'inscrire avec Google
+              S&apos;inscrire avec Google
             </>
           )}
         </button>

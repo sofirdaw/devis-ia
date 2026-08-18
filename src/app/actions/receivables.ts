@@ -9,10 +9,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentCompanyForAction } from "@/lib/current-company";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionResult } from "./auth";
-import type { PaymentTransactionInsert, ReceivableInsert } from "@/types";
+import type { PaymentTransactionInsert } from "@/types";
 
 const PaymentSchema = z.object({
   amount: z.number().positive("Le montant doit être positif"),

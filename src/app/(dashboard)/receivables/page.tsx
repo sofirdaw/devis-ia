@@ -1,8 +1,5 @@
 /**
- * Page Créances — Server Component
- *
- * Récupère la liste des créances côté serveur
- * puis délègue l'interactivité au composant client ReceivablesTable.
+ * Page Créances — Server Component résilient hors-ligne
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -16,20 +13,25 @@ import { Button } from "@/components/ui/button";
 
 export default async function ReceivablesPage() {
   const company = await requireCurrentCompany();
-  const supabase = await createClient();
+  let receivables: Receivable[] = [];
 
-  // Récupérer toutes les créances avec les infos client et facture
-  const { data: receivables } = await supabase
-    .from("receivables")
-    .select("*, client:clients(*), invoice:invoices(*)")
-    .eq("company_id", company.id)
-    .order("created_at", { ascending: false });
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("receivables")
+      .select("*, client:clients(*), invoice:invoices(*)")
+      .eq("company_id", company.id)
+      .order("created_at", { ascending: false });
+    if (data) receivables = data as Receivable[];
+  } catch {
+    // Mode hors-ligne
+  }
 
   return (
     <>
       <Header
         title="Créances"
-        description={`${receivables?.length ?? 0} créance${(receivables?.length ?? 0) > 1 ? "s" : ""} enregistrée${(receivables?.length ?? 0) > 1 ? "s" : ""}`}
+        description={`${receivables.length} créance${receivables.length > 1 ? "s" : ""} enregistrée${receivables.length > 1 ? "s" : ""}`}
         actions={
           <Link href="/dashboard">
             <Button
@@ -45,7 +47,7 @@ export default async function ReceivablesPage() {
       />
       <div className="page-container">
         <ReceivablesTable
-          initialReceivables={(receivables as Receivable[]) ?? []}
+          initialReceivables={receivables}
         />
       </div>
     </>

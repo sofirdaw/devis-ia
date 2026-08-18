@@ -43,9 +43,10 @@ export function OfflineIndicator() {
       setIsSyncing(true);
     };
 
-    const handleSyncComplete = (e: any) => {
+    const handleSyncComplete = (e: Event) => {
       setIsSyncing(false);
-      const count = e.detail?.syncedCount || 0;
+      const customEvent = e as CustomEvent<{ syncedCount?: number }>;
+      const count = customEvent.detail?.syncedCount || 0;
       if (count > 0) {
         setSyncMessage(`${count} document(s) synchronisé(s) !`);
         setTimeout(() => setSyncMessage(""), 4000);
