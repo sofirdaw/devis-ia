@@ -97,31 +97,50 @@ export function LogoUploadForm({ companyId, currentLogoUrl }: LogoUploadFormProp
     // Compression ultra-rapide côté client
     const file = await compressImageFile(rawFile, 800, 0.85);
 
-    // Upload réel vers Supabase Storage
-    const formData = new FormData();
-    formData.append("logo", file);
-
-    startTransition(async () => {
-      const result = await uploadCompanyLogoAction(companyId, formData);
-
-      if (result.error) {
-        setError(result.error);
-        setPreview(currentLogoUrl); // Revenir à l'ancien logo en cas d'échec
-        return;
-      }
-
-      // Mise à jour immédiate du store global Zustand (Sidebar, Header, UserMenu)
-      const newLogoUrl = (result as { logoUrl?: string }).logoUrl || localPreview;
+    // Convertir en Data URL Base64 pour persistance 100% hors-ligne dans localStorage
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const base64DataUrl = reader.result as string;
+      setPreview(base64DataUrl);
       if (company) {
         setCompany({
           ...company,
-          logo_url: newLogoUrl,
+          logo_url: base64DataUrl,
         });
       }
+    };
 
+    // Si connecté, synchroniser vers Supabase Storage en arrière-plan
+    const isOnline = typeof window !== "undefined" && navigator.onLine;
+    if (isOnline) {
+      const formData = new FormData();
+      formData.append("logo", file);
+
+      startTransition(async () => {
+        try {
+          const result = await uploadCompanyLogoAction(companyId, formData);
+          if (result.error) {
+            // Même si Supabase échoue, le logo local reste sauvegardé
+            console.warn("Upload Supabase échoué, logo conservé localement:", result.error);
+          } else if ((result as { logoUrl?: string }).logoUrl) {
+            if (company) {
+              setCompany({
+                ...company,
+                logo_url: (result as { logoUrl?: string }).logoUrl!,
+              });
+            }
+          }
+        } catch {
+          // Hors-ligne / réseau instable
+        }
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      });
+    } else {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    });
+    }
   };
 
   return (

@@ -20,6 +20,7 @@ import {
 import { updateCompanyAction } from "@/app/actions/company";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Company } from "@/types";
+import { useAuthStore } from "@/store/auth.store";
 
 interface CompanyInfoFormProps {
   company: Company;
@@ -32,6 +33,7 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
   const [state, formAction, isPending] = useActionState(action, initialState);
   const [dismissed, setDismissed] = useState(false);
   const showSuccess = Boolean(state.success && !dismissed);
+  const { setCompany, company: currentCompany } = useAuthStore();
 
   // État local pour les valeurs du formulaire
   const [formData, setFormData] = useState({
@@ -48,10 +50,16 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
 
   useEffect(() => {
     if (state.success) {
+      if (currentCompany) {
+        setCompany({
+          ...currentCompany,
+          ...formData,
+        });
+      }
       const timer = setTimeout(() => setDismissed(true), 3000);
       return () => clearTimeout(timer);
     }
-  }, [state.success]);
+  }, [state.success, currentCompany, formData, setCompany]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDismissed(false);

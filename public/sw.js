@@ -1,6 +1,9 @@
-const CACHE_NAME = "devis-ia-v5";
+const CACHE_NAME = "devis-ia-v6";
 const STATIC_ASSETS = [
   "/",
+  "/login",
+  "/register",
+  "/forgot-password",
   "/dashboard",
   "/quotes",
   "/quotes/new",
@@ -20,6 +23,7 @@ const STATIC_ASSETS = [
   "/icons/apple-touch-icon.png",
   "/favicon.ico",
 ];
+
 
 // Inscription et préchargement du cache
 self.addEventListener("install", (event) => {
@@ -136,42 +140,67 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 3. Navigation de pages -> Stale-While-Revalidate avec Fallback Cache Shell
+  // 3. Navigation de pages -> Stratégie Cache-First avec revalidation en arrière-plan
   if (event.request.mode === "navigate") {
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        const networkFetch = fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              const responseToCache = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
-            }
-            return networkResponse;
-          })
-          .catch(async () => {
-            if (cachedResponse) return cachedResponse;
+      caches
+        .match(event.request)
+        .then((cachedResponse) => {
+          const networkFetch = fetch(event.request)
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
+                const responseToCache = networkResponse.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                  cache.put(event.request, responseToCache);
+                });
+              }
+              return networkResponse;
+            })
+            .catch(async () => {
+              if (cachedResponse) return cachedResponse;
 
-            // Fallback de navigation SPA pour rester dans l'application
-            const fallback =
-              (await caches.match(url.pathname)) ||
-              (await caches.match("/dashboard")) ||
-              (await caches.match("/quotes")) ||
-              (await caches.match("/"));
-            return (
-              fallback ||
-              new Response("Application hors-ligne", {
+              // Fallback Shell pour rester dans l'application PWA sans erreur WebKit
+              const fallback =
+                (await caches.match(url.pathname)) ||
+                (await caches.match("/dashboard")) ||
+                (await caches.match("/quotes")) ||
+                (await caches.match("/login")) ||
+                (await caches.match("/"));
+
+              return (
+                fallback ||
+                new Response(
+                  "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Devis IA</title></head><body><script>window.location.href='/dashboard';</script></body></html>",
+                  {
+                    status: 200,
+                    headers: { "Content-Type": "text/html; charset=utf-8" },
+                  }
+                )
+              );
+            });
+
+          // Si la page est en cache, la renvoyer immédiatement (<5ms)
+          return cachedResponse || networkFetch;
+        })
+        .catch(async () => {
+          const fallback =
+            (await caches.match("/dashboard")) ||
+            (await caches.match("/login")) ||
+            (await caches.match("/"));
+          return (
+            fallback ||
+            new Response(
+              "<!DOCTYPE html><html><head><meta charset='utf-8'></head><body><script>window.location.href='/';</script></body></html>",
+              {
                 status: 200,
                 headers: { "Content-Type": "text/html; charset=utf-8" },
-              })
-            );
-          });
-
-        return cachedResponse || networkFetch;
-      })
+              }
+            )
+          );
+        })
     );
     return;
   }
 });
+
 

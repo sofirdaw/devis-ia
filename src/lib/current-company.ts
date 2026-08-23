@@ -3,7 +3,6 @@
  * Support du mode hors-ligne pour la PWA (fallback local).
  */
 
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Company } from "@/types";
 
@@ -32,25 +31,25 @@ export async function requireCurrentCompany(): Promise<Company> {
     }
   }
 
-  if (!user) redirect("/login");
+  if (user) {
+    try {
+      const { data: company } = await supabase
+        .from("companies")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-  try {
-    const { data: company } = await supabase
-      .from("companies")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (company) return company as Company;
-  } catch {
-    // Mode hors-ligne : la base Supabase n'est pas joignable
+      if (company) return company as Company;
+    } catch {
+      // Mode hors-ligne : la base Supabase n'est pas joignable
+    }
   }
 
-  // Entreprise fallback en mode 100% hors-ligne
+  // Entreprise fallback en mode 100% hors-ligne (évite le crash WebKit)
   return {
     id: "offline_company_id",
-    user_id: user.id,
-    name: "Mon Entreprise (Local)",
+    user_id: user?.id ?? "offline_user_id",
+    name: "Mon Entreprise",
     quote_prefix: "DEV",
     invoice_prefix: "FAC",
     tax_rate: 18,
