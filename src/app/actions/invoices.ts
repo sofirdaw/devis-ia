@@ -39,7 +39,7 @@ async function getCurrentCompany() {
 
 export async function createInvoiceAction(
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const itemsRaw = formData.get("items");
   let items;
@@ -72,7 +72,7 @@ export async function createInvoiceAction(
   const { subtotal, tax, total } = calculateTotals(
     parsed.data.items,
     company.tax_rate,
-    parsed.data.discount,
+    parsed.data.discount
   );
 
   const { data: invoiceNumber } = await supabase.rpc("next_document_number", {
@@ -111,9 +111,7 @@ export async function createInvoiceAction(
     total: item.quantity * item.unit_price,
   }));
 
-  const { error: itemsError } = await supabase
-    .from("invoice_items")
-    .insert(itemsToInsert);
+  const { error: itemsError } = await supabase.from("invoice_items").insert(itemsToInsert);
 
   if (itemsError) {
     await supabase.from("invoices").delete().eq("id", invoice.id);
@@ -128,13 +126,10 @@ export async function createInvoiceAction(
 
 export async function updateInvoiceStatusAction(
   invoiceId: string,
-  status: InvoiceStatus,
+  status: InvoiceStatus
 ): Promise<ActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("invoices")
-    .update({ status })
-    .eq("id", invoiceId);
+  const { error } = await supabase.from("invoices").update({ status }).eq("id", invoiceId);
 
   if (error) return { error: "Erreur lors de la mise à jour du statut" };
 
@@ -145,14 +140,9 @@ export async function updateInvoiceStatusAction(
 
 // ── DELETE ───────────────────────────────────────────────────────────────────
 
-export async function deleteInvoiceAction(
-  invoiceId: string,
-): Promise<ActionResult> {
+export async function deleteInvoiceAction(invoiceId: string): Promise<ActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("invoices")
-    .delete()
-    .eq("id", invoiceId);
+  const { error } = await supabase.from("invoices").delete().eq("id", invoiceId);
 
   if (error) return { error: "Erreur lors de la suppression" };
 
@@ -180,7 +170,7 @@ export async function markOverdueInvoices(): Promise<void> {
 export async function updateInvoiceAction(
   invoiceId: string,
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const itemsRaw = formData.get("items");
   let items;
@@ -221,7 +211,7 @@ export async function updateInvoiceAction(
   const { subtotal, tax, total } = calculateTotals(
     parsed.data.items,
     company.tax_rate,
-    parsed.data.discount,
+    parsed.data.discount
   );
 
   const { error: updateError } = await supabase
@@ -237,8 +227,7 @@ export async function updateInvoiceAction(
     })
     .eq("id", invoiceId);
 
-  if (updateError)
-    return { error: "Erreur lors de la mise à jour de la facture" };
+  if (updateError) return { error: "Erreur lors de la mise à jour de la facture" };
 
   await supabase.from("invoice_items").delete().eq("invoice_id", invoiceId);
 
@@ -251,9 +240,7 @@ export async function updateInvoiceAction(
     total: item.quantity * item.unit_price,
   }));
 
-  const { error: itemsError } = await supabase
-    .from("invoice_items")
-    .insert(itemsToInsert);
+  const { error: itemsError } = await supabase.from("invoice_items").insert(itemsToInsert);
   if (itemsError) return { error: "Erreur lors de la mise à jour des lignes" };
 
   revalidatePath("/invoices");

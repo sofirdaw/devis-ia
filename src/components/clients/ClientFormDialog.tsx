@@ -24,17 +24,11 @@ interface ClientFormDialogProps {
 
 const initialState: ActionResult = {};
 
-export function ClientFormDialog({
-  open,
-  onOpenChange,
-  client,
-}: ClientFormDialogProps) {
+export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialogProps) {
   const isEditMode = !!client;
 
   // Sélectionne la bonne Server Action selon le mode
-  const action = isEditMode
-    ? updateClientAction.bind(null, client.id)
-    : createClientAction;
+  const action = isEditMode ? updateClientAction.bind(null, client.id) : createClientAction;
 
   const [state, formAction, isPending] = useActionState(action, initialState);
 
@@ -106,11 +100,7 @@ export function ClientFormDialog({
             >
               Annuler
             </Button>
-            <Button
-              type="submit"
-              isLoading={isPending}
-              className="w-full sm:w-auto"
-            >
+            <Button type="submit" isLoading={isPending} className="w-full sm:w-auto">
               {isEditMode ? "Enregistrer" : "Ajouter"}
             </Button>
           </div>

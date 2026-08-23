@@ -1,4 +1,4 @@
-const CACHE_NAME = "devis-ia-v4";
+const CACHE_NAME = "devis-ia-v5";
 const STATIC_ASSETS = [
   "/",
   "/dashboard",
@@ -55,7 +55,7 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(event.request.url);
 
-  // Ignorer les requêtes d'authentification et de dev HMR WebSocket
+  // Ignorer les requêtes de dev HMR WebSocket et Supabase Auth en direct
   if (
     url.pathname.startsWith("/_next/webpack-hmr") ||
     url.pathname.startsWith("/api/auth") ||
@@ -64,7 +64,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 1. Assets Statiques (Scripts, CSS, Polices, Images, Icônes) -> CACHE-FIRST (0ms)
+  // 1. Assets Statiques & Chunks JS/CSS/Fonts -> CACHE-FIRST
   const isStaticAsset =
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
@@ -72,13 +72,13 @@ self.addEventListener("fetch", (event) => {
     url.pathname.endsWith(".png") ||
     url.pathname.endsWith(".jpg") ||
     url.pathname.endsWith(".webp") ||
-    url.pathname.endsWith(".svg");
+    url.pathname.endsWith(".svg") ||
+    url.pathname.endsWith(".wasm");
 
   if (isStaticAsset) {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
         if (cachedResponse) {
-          // Revalider silencieusement en arrière-plan
           fetch(event.request)
             .then((networkResponse) => {
               if (networkResponse && networkResponse.status === 200) {
@@ -105,7 +105,38 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 2. Navigation de pages -> Stale-While-Revalidate avec priorité Cache et Fallback Shell
+  // 2. Next.js RSC Data & Prefetches (requêtes ?_rsc=... ou header rsc)
+  const isRSCRequest =
+    url.searchParams.has("_rsc") ||
+    event.request.headers.get("RSC") === "1" ||
+    event.request.headers.get("Next-Router-Prefetch") === "1";
+
+  if (isRSCRequest) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          // Si hors-ligne et RSC manquant, renvoyer une réponse vide valide
+          return new Response("", {
+            status: 200,
+            headers: { "Content-Type": "text/x-component" },
+          });
+        })
+    );
+    return;
+  }
+
+  // 3. Navigation de pages -> Stale-While-Revalidate avec Fallback Cache Shell
   if (event.request.mode === "navigate") {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
@@ -122,8 +153,9 @@ self.addEventListener("fetch", (event) => {
           .catch(async () => {
             if (cachedResponse) return cachedResponse;
 
-            // Fallback de navigation générale pour éviter que Safari n'ouvre le navigateur
+            // Fallback de navigation SPA pour rester dans l'application
             const fallback =
+              (await caches.match(url.pathname)) ||
               (await caches.match("/dashboard")) ||
               (await caches.match("/quotes")) ||
               (await caches.match("/"));
@@ -136,10 +168,10 @@ self.addEventListener("fetch", (event) => {
             );
           });
 
-        // Si la page est déjà en cache, la renvoyer IMMÉDIATEMENT (0ms)
         return cachedResponse || networkFetch;
       })
     );
     return;
   }
 });
+

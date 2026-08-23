@@ -10,16 +10,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import {
-  Search,
-  Plus,
-  Pencil,
-  Trash2,
-  Phone,
-  Mail,
-  MapPin,
-  Users,
-} from "lucide-react";
+import { Search, Plus, Pencil, Trash2, Phone, Mail, MapPin, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ClientFormDialog } from "./ClientFormDialog";
@@ -47,7 +38,7 @@ export function ClientsTable({ initialClients }: ClientsTableProps) {
       (c) =>
         c.name.toLowerCase().includes(term) ||
         c.phone?.toLowerCase().includes(term) ||
-        c.email?.toLowerCase().includes(term),
+        c.email?.toLowerCase().includes(term)
     );
   }, [initialClients, search]);
 
@@ -73,11 +64,7 @@ export function ClientsTable({ initialClients }: ClientsTableProps) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button
-          leftIcon={<Plus size={16} />}
-          onClick={openCreateForm}
-          className="w-full sm:w-auto"
-        >
+        <Button leftIcon={<Plus size={16} />} onClick={openCreateForm} className="w-full sm:w-auto">
           Ajouter un client
         </Button>
       </div>
@@ -87,17 +74,10 @@ export function ClientsTable({ initialClients }: ClientsTableProps) {
         <div className="bg-white rounded-xl border border-gray-200 py-12 lg:py-16 text-center">
           <Users size={32} className="text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 text-sm">
-            {search
-              ? "Aucun client trouvé pour cette recherche"
-              : "Aucun client pour le moment"}
+            {search ? "Aucun client trouvé pour cette recherche" : "Aucun client pour le moment"}
           </p>
           {!search && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4"
-              onClick={openCreateForm}
-            >
+            <Button variant="outline" size="sm" className="mt-4" onClick={openCreateForm}>
               Ajouter votre premier client
             </Button>
           )}
@@ -109,15 +89,9 @@ export function ClientsTable({ initialClients }: ClientsTableProps) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50">
-                  <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">
-                    Nom
-                  </th>
-                  <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">
-                    Contact
-                  </th>
-                  <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">
-                    Adresse
-                  </th>
+                  <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">Nom</th>
+                  <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">Contact</th>
+                  <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">Adresse</th>
                   <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">
                     Ajouté le
                   </th>
@@ -128,37 +102,22 @@ export function ClientsTable({ initialClients }: ClientsTableProps) {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredClients.map((client) => (
-                  <tr
-                    key={client.id}
-                    className="hover:bg-gray-50/50 transition-colors"
-                  >
+                  <tr key={client.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-4 sm:px-5 py-3 font-medium text-gray-900">
-                      <span className="block max-w-35 sm:max-w-55 truncate">
-                        {client.name}
-                      </span>
+                      <span className="block max-w-35 sm:max-w-55 truncate">{client.name}</span>
                     </td>
                     <td className="px-4 sm:px-5 py-3 text-gray-600">
                       <div className="space-y-0.5 max-w-35 sm:max-w-50">
                         {client.phone && (
                           <div className="flex items-center gap-1.5 text-xs">
-                            <Phone
-                              size={12}
-                              className="text-gray-400 shrink-0"
-                            />
-                            <span className="min-w-0 truncate">
-                              {client.phone}
-                            </span>
+                            <Phone size={12} className="text-gray-400 shrink-0" />
+                            <span className="min-w-0 truncate">{client.phone}</span>
                           </div>
                         )}
                         {client.email && (
                           <div className="flex items-center gap-1.5 text-xs">
-                            <Mail
-                              size={12}
-                              className="text-gray-400 shrink-0"
-                            />
-                            <span className="min-w-0 truncate">
-                              {client.email}
-                            </span>
+                            <Mail size={12} className="text-gray-400 shrink-0" />
+                            <span className="min-w-0 truncate">{client.email}</span>
                           </div>
                         )}
                       </div>
@@ -166,13 +125,8 @@ export function ClientsTable({ initialClients }: ClientsTableProps) {
                     <td className="px-4 sm:px-5 py-3 text-gray-600">
                       {client.address ? (
                         <div className="flex items-center gap-1.5 text-xs max-w-37.5 sm:max-w-50">
-                          <MapPin
-                            size={12}
-                            className="text-gray-400 shrink-0"
-                          />
-                          <span className="min-w-0 truncate">
-                            {client.address}
-                          </span>
+                          <MapPin size={12} className="text-gray-400 shrink-0" />
+                          <span className="min-w-0 truncate">{client.address}</span>
                         </div>
                       ) : (
                         <span className="text-gray-300">—</span>
@@ -208,11 +162,7 @@ export function ClientsTable({ initialClients }: ClientsTableProps) {
       )}
 
       {/* Modale de création/édition */}
-      <ClientFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        client={editingClient}
-      />
+      <ClientFormDialog open={formOpen} onOpenChange={setFormOpen} client={editingClient} />
 
       {/* Modale de confirmation suppression */}
       {deletingClient && (

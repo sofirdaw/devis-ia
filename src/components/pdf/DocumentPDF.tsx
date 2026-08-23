@@ -3,13 +3,7 @@
  * Design minimaliste "sans entête", haute lisibilité et conforme au modèle A4
  */
 
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-} from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import { formatCurrencyPDF, formatDateNumeric } from "@/lib/utils";
 import type { Company, Client } from "@/types";
 
@@ -281,9 +275,7 @@ export function DocumentPDF({ data }: { data: PDFDocumentData }) {
         {/* ── MÉTADONNÉES SUPÉRIEURES (DATE / ÉCHÉANCE / N°) ─────────────── */}
         <View style={styles.metaRow}>
           <View style={styles.metaLeft}>
-            <Text style={styles.metaLeftText}>
-              DATE : {formatDateNumeric(data.date)}
-            </Text>
+            <Text style={styles.metaLeftText}>DATE : {formatDateNumeric(data.date)}</Text>
             <Text style={styles.metaLeftText}>
               ÉCHÉANCE : {formatDateNumeric(data.dueOrValidDate || data.date)}
             </Text>
@@ -304,21 +296,13 @@ export function DocumentPDF({ data }: { data: PDFDocumentData }) {
           <View style={styles.recipient}>
             <Text style={styles.sectionTitle}>CLIENT :</Text>
             <Text style={styles.partyName}>{data.client.name}</Text>
-            {data.client.email && (
-              <Text style={styles.partyLine}>{data.client.email}</Text>
-            )}
-            {data.client.phone && (
-              <Text style={styles.partyLine}>{data.client.phone}</Text>
-            )}
-            {data.client.address && (
-              <Text style={styles.partyLine}>{data.client.address}</Text>
-            )}
+            {data.client.email && <Text style={styles.partyLine}>{data.client.email}</Text>}
+            {data.client.phone && <Text style={styles.partyLine}>{data.client.phone}</Text>}
+            {data.client.address && <Text style={styles.partyLine}>{data.client.address}</Text>}
           </View>
 
           <View style={styles.codeSection}>
-            <Text style={styles.codeText}>
-              CODE : {data.client.code || data.client.ifu || "—"}
-            </Text>
+            <Text style={styles.codeText}>CODE : {data.client.code || data.client.ifu || "—"}</Text>
           </View>
         </View>
 
@@ -345,9 +329,7 @@ export function DocumentPDF({ data }: { data: PDFDocumentData }) {
                 {formatCurrencyPDF(item.unit_price)}
               </Text>
               <Text style={[styles.colQty, styles.tdText]}>{item.quantity}</Text>
-              <Text style={[styles.colTotal, styles.tdText]}>
-                {formatCurrencyPDF(item.total)}
-              </Text>
+              <Text style={[styles.colTotal, styles.tdText]}>{formatCurrencyPDF(item.total)}</Text>
             </View>
           ))}
 
@@ -368,9 +350,7 @@ export function DocumentPDF({ data }: { data: PDFDocumentData }) {
             <Text style={styles.paymentTitle}>RÈGLEMENT :</Text>
             <View style={styles.paymentText}>
               <Text style={{ marginBottom: 2 }}>Par virement bancaire :</Text>
-              <Text style={{ marginBottom: 2 }}>
-                Banque : {data.company.bank_name || "—"}
-              </Text>
+              <Text style={{ marginBottom: 2 }}>Banque : {data.company.bank_name || "—"}</Text>
               <Text style={{ marginBottom: 2 }}>
                 Compte : {data.company.bank_account || data.company.iban || "—"}
               </Text>

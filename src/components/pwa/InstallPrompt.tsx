@@ -34,10 +34,7 @@ export function InstallPrompt() {
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
 
     return () => {
-      window.removeEventListener(
-        "beforeinstallprompt",
-        handleBeforeInstallPrompt
-      );
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     };
   }, []);
 
@@ -94,7 +91,9 @@ export function InstallPrompt() {
               <p className="text-xs font-bold">Installer sur iPhone / iPad</p>
               <p className="text-[11px] text-gray-500">
                 Appuyez sur <span className="font-semibold text-primary-600">Partager ⎋</span> puis{" "}
-                <span className="font-semibold text-primary-600">&quot;Sur l&apos;écran d&apos;accueil&quot; ➕</span>
+                <span className="font-semibold text-primary-600">
+                  &quot;Sur l&apos;écran d&apos;accueil&quot; ➕
+                </span>
               </p>
             </div>
           </div>

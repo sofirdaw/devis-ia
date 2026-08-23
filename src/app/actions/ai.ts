@@ -9,9 +9,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentCompanyForAction } from "@/lib/current-company";
-import {
-  SYSTEM_PROMPT_BASE,
-} from "@/lib/openai";
+import { SYSTEM_PROMPT_BASE } from "@/lib/openai";
 import {
   extractDocumentFromTextWithFallback,
   extractDocumentFromImageWithFallback,
@@ -65,18 +63,14 @@ async function getContextForAI() {
 function buildCatalogContext(products: Product[]): string {
   if (products.length === 0) return "";
 
-  const catalogList = products
-    .map((p) => `- "${p.name}" : ${p.price} FCFA`)
-    .join("\n");
+  const catalogList = products.map((p) => `- "${p.name}" : ${p.price} FCFA`).join("\n");
 
   return `\n\nCatalogue produits existants de l'entreprise (réutilise EXACTEMENT ces noms et prix si l'utilisateur les mentionne, même approximativement) :\n${catalogList}`;
 }
 
 // ── Action principale : extraction IA depuis un texte libre ───────────────────
 
-export async function generateDocumentFromText(
-  description: string,
-): Promise<AIExtractionResult> {
+export async function generateDocumentFromText(description: string): Promise<AIExtractionResult> {
   if (!description.trim()) {
     return { success: false, error: "Veuillez décrire votre devis ou facture" };
   }
@@ -89,8 +83,7 @@ export async function generateDocumentFromText(
     };
   }
 
-  const systemPrompt =
-    SYSTEM_PROMPT_BASE + buildCatalogContext(context.products as Product[]);
+  const systemPrompt = SYSTEM_PROMPT_BASE + buildCatalogContext(context.products as Product[]);
 
   const result = await extractDocumentFromTextWithFallback(description, systemPrompt);
 
@@ -115,14 +108,14 @@ export async function generateDocumentFromText(
     ? context.clients.find(
         (c) =>
           c.name.toLowerCase().includes(parsed.client_name.toLowerCase()) ||
-          parsed.client_name.toLowerCase().includes(c.name.toLowerCase()),
+          parsed.client_name.toLowerCase().includes(c.name.toLowerCase())
       )
     : undefined;
 
   // ── Faire correspondre chaque ligne à un produit existant si possible ────────
   const items = parsed.items.map((item) => {
     const matchedProduct = (context.products as Product[]).find(
-      (p) => p.name.toLowerCase() === item.designation.toLowerCase(),
+      (p) => p.name.toLowerCase() === item.designation.toLowerCase()
     );
 
     return {
@@ -148,9 +141,7 @@ export async function generateDocumentFromText(
 
 // ── Action : extraction IA depuis une image (OCR via Vision) ──────────────
 
-export async function generateDocumentFromImage(
-  imageBase64: string,
-): Promise<AIExtractionResult> {
+export async function generateDocumentFromImage(imageBase64: string): Promise<AIExtractionResult> {
   // Vérifier que l'image est en base64 valide
   if (!imageBase64 || !imageBase64.startsWith("data:image/")) {
     return {
@@ -167,15 +158,15 @@ export async function generateDocumentFromImage(
     };
   }
 
-  const systemPrompt =
-    SYSTEM_PROMPT_BASE + buildCatalogContext(context.products as Product[]);
+  const systemPrompt = SYSTEM_PROMPT_BASE + buildCatalogContext(context.products as Product[]);
 
   const result = await extractDocumentFromImageWithFallback(imageBase64, systemPrompt);
 
   if (!result.success || !result.data) {
     return {
       success: false,
-      error: result.error || "Erreur lors de l'analyse de l'image. Réessayez ou utilisez le mode texte.",
+      error:
+        result.error || "Erreur lors de l'analyse de l'image. Réessayez ou utilisez le mode texte.",
     };
   }
 
@@ -189,13 +180,13 @@ export async function generateDocumentFromImage(
     ? context.clients.find(
         (c) =>
           c.name.toLowerCase().includes(parsed.client_name.toLowerCase()) ||
-          parsed.client_name.toLowerCase().includes(c.name.toLowerCase()),
+          parsed.client_name.toLowerCase().includes(c.name.toLowerCase())
       )
     : undefined;
 
   const items = parsed.items.map((item) => {
     const matchedProduct = (context.products as Product[]).find(
-      (p) => p.name.toLowerCase() === item.designation.toLowerCase(),
+      (p) => p.name.toLowerCase() === item.designation.toLowerCase()
     );
 
     return {

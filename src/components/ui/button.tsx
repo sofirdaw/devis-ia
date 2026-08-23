@@ -1,13 +1,13 @@
 /**
  * Composant Button — Bouton réutilisable
- * 
+ *
  * Variantes disponibles :
  * - primary   : bouton bleu principal (action principale)
  * - secondary : bouton gris (action secondaire)
  * - danger    : bouton rouge (suppression, action destructive)
  * - ghost     : bouton transparent (navigation, icônes)
  * - outline   : bouton avec bordure (actions secondaires visibles)
- * 
+ *
  * Tailles : sm | md | lg
  */
 
@@ -31,16 +31,11 @@ const BASE =
 
 // Styles par variante
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary:
-    "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 focus:ring-blue-500",
-  secondary:
-    "bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300 focus:ring-gray-400",
-  danger:
-    "bg-red-500 text-white hover:bg-red-600 active:bg-red-700 focus:ring-red-400",
-  ghost:
-    "text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus:ring-gray-300",
-  outline:
-    "border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-blue-500",
+  primary: "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 focus:ring-blue-500",
+  secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300 focus:ring-gray-400",
+  danger: "bg-red-500 text-white hover:bg-red-600 active:bg-red-700 focus:ring-red-400",
+  ghost: "text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus:ring-gray-300",
+  outline: "border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-blue-500",
 };
 
 // Styles par taille

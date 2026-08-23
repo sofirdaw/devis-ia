@@ -82,9 +82,7 @@ export async function syncPendingData(): Promise<{ syncedCount: number }> {
     }
 
     // Émettre l'événement de fin de synchro
-    window.dispatchEvent(
-      new CustomEvent("pwa-sync-complete", { detail: { syncedCount } })
-    );
+    window.dispatchEvent(new CustomEvent("pwa-sync-complete", { detail: { syncedCount } }));
   } catch (error) {
     console.error("Erreur globale lors de la synchronisation hors-ligne:", error);
   } finally {

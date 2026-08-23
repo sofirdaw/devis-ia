@@ -65,9 +65,7 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
     <Card>
       <CardHeader className="p-4 sm:p-6 lg:p-8">
         <CardTitle>Informations de l&apos;entreprise</CardTitle>
-        <CardDescription>
-          Ces informations apparaissent sur vos devis et factures
-        </CardDescription>
+        <CardDescription>Ces informations apparaissent sur vos devis et factures</CardDescription>
       </CardHeader>
 
       <form
@@ -110,12 +108,7 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
             />
           </div>
 
-          <Input
-            name="address"
-            label="Adresse"
-            value={formData.address}
-            onChange={handleChange}
-          />
+          <Input name="address" label="Adresse" value={formData.address} onChange={handleChange} />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Input
@@ -167,11 +160,7 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
           ) : (
             <span />
           )}
-          <Button
-            type="submit"
-            isLoading={isPending}
-            className="w-full sm:w-auto"
-          >
+          <Button type="submit" isLoading={isPending} className="w-full sm:w-auto">
             Enregistrer
           </Button>
         </CardFooter>

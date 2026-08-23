@@ -9,10 +9,7 @@ import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import {
-  createSupplierAction,
-  updateSupplierAction,
-} from "@/app/actions/suppliers";
+import { createSupplierAction, updateSupplierAction } from "@/app/actions/suppliers";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Supplier } from "@/types";
 
@@ -78,11 +75,7 @@ export function SupplierForm({ supplier }: SupplierFormProps) {
 
         <div className="flex flex-col sm:flex-row sm:justify-between gap-3 pt-4 lg:pt-6 border-t border-gray-100 mt-6 lg:mt-8">
           <Link href="/suppliers">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full sm:w-auto"
-            >
+            <Button type="button" variant="outline" className="w-full sm:w-auto">
               Annuler
             </Button>
           </Link>

@@ -1,6 +1,6 @@
 /**
  * Configuration Tailwind CSS
- * 
+ *
  * Design system de l'application :
  * - Couleur principale : Bleu professionnel (#2563EB et variantes)
  * - Police : Inter (lisibilité optimale pour les chiffres et tableaux)
@@ -12,7 +12,7 @@ import type { Config } from "tailwindcss";
 const config: Config = {
   // Activer le mode dark si besoin futur
   darkMode: "class",
-  
+
   // Fichiers à scanner pour purger le CSS inutilisé
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -26,7 +26,7 @@ const config: Config = {
       colors: {
         // Couleur principale — utilisée pour les boutons CTA, liens actifs
         primary: {
-          50:  "#eff6ff",
+          50: "#eff6ff",
           100: "#dbeafe",
           200: "#bfdbfe",
           300: "#93c5fd",
@@ -39,19 +39,19 @@ const config: Config = {
         },
         // Couleur de succès — facture payée, devis accepté
         success: {
-          50:  "#f0fdf4",
+          50: "#f0fdf4",
           500: "#22c55e",
           600: "#16a34a",
         },
         // Couleur d'alerte — facture en retard, action requise
         warning: {
-          50:  "#fffbeb",
+          50: "#fffbeb",
           500: "#f59e0b",
           600: "#d97706",
         },
         // Couleur d'erreur — suppression, refus
         danger: {
-          50:  "#fef2f2",
+          50: "#fef2f2",
           500: "#ef4444",
           600: "#dc2626",
         },

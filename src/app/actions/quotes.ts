@@ -41,7 +41,7 @@ async function getCurrentCompany() {
 
 export async function createQuoteAction(
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const itemsRaw = formData.get("items");
   let items;
@@ -75,7 +75,7 @@ export async function createQuoteAction(
   const { subtotal, tax, total } = calculateTotals(
     parsed.data.items,
     company.tax_rate,
-    parsed.data.discount,
+    parsed.data.discount
   );
 
   // 2. Générer le numéro de devis via la fonction SQL
@@ -117,9 +117,7 @@ export async function createQuoteAction(
     total: item.quantity * item.unit_price,
   }));
 
-  const { error: itemsError } = await supabase
-    .from("quote_items")
-    .insert(itemsToInsert);
+  const { error: itemsError } = await supabase.from("quote_items").insert(itemsToInsert);
 
   if (itemsError) {
     // Rollback manuel : supprimer le devis si les lignes échouent
@@ -141,7 +139,7 @@ export async function createQuoteAction(
 export async function updateQuoteAction(
   quoteId: string,
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const itemsRaw = formData.get("items");
   let items;
@@ -183,7 +181,7 @@ export async function updateQuoteAction(
   const { subtotal, tax, total } = calculateTotals(
     parsed.data.items,
     company.tax_rate,
-    parsed.data.discount,
+    parsed.data.discount
   );
 
   // Mettre à jour l'en-tête du devis
@@ -215,9 +213,7 @@ export async function updateQuoteAction(
     total: item.quantity * item.unit_price,
   }));
 
-  const { error: itemsError } = await supabase
-    .from("quote_items")
-    .insert(itemsToInsert);
+  const { error: itemsError } = await supabase.from("quote_items").insert(itemsToInsert);
 
   if (itemsError) return { error: "Erreur lors de la mise à jour des lignes" };
 
@@ -230,13 +226,10 @@ export async function updateQuoteAction(
 
 export async function updateQuoteStatusAction(
   quoteId: string,
-  status: QuoteStatus,
+  status: QuoteStatus
 ): Promise<ActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("quotes")
-    .update({ status })
-    .eq("id", quoteId);
+  const { error } = await supabase.from("quotes").update({ status }).eq("id", quoteId);
 
   if (error) return { error: "Erreur lors de la mise à jour du statut" };
 
@@ -247,9 +240,7 @@ export async function updateQuoteStatusAction(
 
 // ── DELETE ───────────────────────────────────────────────────────────────────
 
-export async function deleteQuoteAction(
-  quoteId: string,
-): Promise<ActionResult> {
+export async function deleteQuoteAction(quoteId: string): Promise<ActionResult> {
   const supabase = await createClient();
   // quote_items est supprimé en cascade automatiquement (ON DELETE CASCADE)
   const { error } = await supabase.from("quotes").delete().eq("id", quoteId);
@@ -266,9 +257,7 @@ export async function deleteQuoteAction(
  * Convertit un devis accepté en facture en un clic.
  * Copie les lignes du devis vers une nouvelle facture.
  */
-export async function convertQuoteToInvoiceAction(
-  quoteId: string,
-): Promise<ActionResult> {
+export async function convertQuoteToInvoiceAction(quoteId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const company = await getCurrentCompany();
   if (!company) return { error: "Entreprise introuvable" };
@@ -326,7 +315,7 @@ export async function convertQuoteToInvoiceAction(
       quantity: item.quantity,
       unit_price: item.unit_price,
       total: item.total,
-    }),
+    })
   );
 
   await supabase.from("invoice_items").insert(itemsToInsert);

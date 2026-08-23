@@ -51,8 +51,7 @@ export default async function ReceivableDetailPage({
     .order("payment_date", { ascending: false });
 
   const status = statusConfig[receivable.status as keyof typeof statusConfig];
-  const progressPercent =
-    (Number(receivable.paid_amount) / Number(receivable.total_amount)) * 100;
+  const progressPercent = (Number(receivable.paid_amount) / Number(receivable.total_amount)) * 100;
 
   return (
     <>
@@ -60,9 +59,7 @@ export default async function ReceivableDetailPage({
         title="Détail de la créance"
         description={
           <div className="flex items-center gap-2">
-            <span className="text-gray-600">
-              Facture {receivable.invoice?.invoice_number}
-            </span>
+            <span className="text-gray-600">Facture {receivable.invoice?.invoice_number}</span>
             <span>•</span>
             <Badge className={status.color}>{status.label}</Badge>
           </div>
@@ -82,9 +79,7 @@ export default async function ReceivableDetailPage({
         <div className="lg:col-span-2 space-y-6 lg:space-y-8">
           {/* Carte résumé */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 lg:p-8">
-            <h3 className="font-semibold text-gray-900 mb-4 lg:mb-6">
-              Informations de la créance
-            </h3>
+            <h3 className="font-semibold text-gray-900 mb-4 lg:mb-6">Informations de la créance</h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
               <div>
@@ -93,9 +88,7 @@ export default async function ReceivableDetailPage({
                 </p>
                 <div className="flex items-center gap-2">
                   <User size={16} className="text-gray-400" />
-                  <span className="font-medium text-gray-900">
-                    {receivable.client?.name}
-                  </span>
+                  <span className="font-medium text-gray-900">{receivable.client?.name}</span>
                 </div>
               </div>
 
@@ -118,9 +111,7 @@ export default async function ReceivableDetailPage({
                 {receivable.due_date ? (
                   <div className="flex items-center gap-2">
                     <Calendar size={16} className="text-gray-400" />
-                    <span className="text-gray-900">
-                      {formatDate(receivable.due_date)}
-                    </span>
+                    <span className="text-gray-900">{formatDate(receivable.due_date)}</span>
                   </div>
                 ) : (
                   <span className="text-gray-300">—</span>
@@ -139,9 +130,7 @@ export default async function ReceivableDetailPage({
             <div className="mt-6 lg:mt-8 pt-4 lg:pt-6 border-t border-gray-100">
               <div className="flex justify-between text-sm mb-2 lg:mb-3">
                 <span className="text-gray-600">Progression du paiement</span>
-                <span className="font-semibold text-gray-900">
-                  {progressPercent.toFixed(0)}%
-                </span>
+                <span className="font-semibold text-gray-900">{progressPercent.toFixed(0)}%</span>
               </div>
               <div className="h-2 lg:h-3 bg-gray-100 rounded-full overflow-hidden">
                 <div
@@ -154,9 +143,7 @@ export default async function ReceivableDetailPage({
 
           {/* Carte montants */}
           <div className="bg-gradient-to-br from-slate-50 to-gray-50 rounded-xl border border-gray-200 p-4 sm:p-6 lg:p-8">
-            <h3 className="font-semibold text-gray-900 mb-4 lg:mb-6">
-              Montants
-            </h3>
+            <h3 className="font-semibold text-gray-900 mb-4 lg:mb-6">Montants</h3>
 
             <div className="space-y-3 lg:space-y-4">
               <div className="flex justify-between items-center py-2 lg:py-3 border-b border-gray-200">
@@ -182,9 +169,7 @@ export default async function ReceivableDetailPage({
 
           {/* Historique des paiements */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 lg:p-8">
-            <h3 className="font-semibold text-gray-900 mb-4 lg:mb-6">
-              Historique des paiements
-            </h3>
+            <h3 className="font-semibold text-gray-900 mb-4 lg:mb-6">Historique des paiements</h3>
 
             {payments && payments.length > 0 ? (
               <div className="space-y-3 lg:space-y-4">
@@ -203,9 +188,7 @@ export default async function ReceivableDetailPage({
                       <div className="flex items-center gap-2 lg:gap-3 mt-1 lg:mt-2 text-xs sm:text-sm text-gray-600">
                         <span>{formatDate(payment.payment_date)}</span>
                         <span className="text-gray-300">•</span>
-                        <span className="capitalize">
-                          {payment.payment_method}
-                        </span>
+                        <span className="capitalize">{payment.payment_method}</span>
                         {payment.reference && (
                           <>
                             <span className="text-gray-300">•</span>
@@ -214,19 +197,13 @@ export default async function ReceivableDetailPage({
                         )}
                       </div>
                     </div>
-                    <DeletePaymentButton
-                      paymentId={payment.id}
-                      receivableId={receivable.id}
-                    />
+                    <DeletePaymentButton paymentId={payment.id} receivableId={receivable.id} />
                   </div>
                 ))}
               </div>
             ) : (
               <div className="text-center py-8 lg:py-12 text-gray-500 text-sm">
-                <DollarSign
-                  size={28}
-                  className="text-gray-300 mx-auto mb-2 lg:mb-3"
-                />
+                <DollarSign size={28} className="text-gray-300 mx-auto mb-2 lg:mb-3" />
                 Aucun paiement enregistré
               </div>
             )}
@@ -236,9 +213,7 @@ export default async function ReceivableDetailPage({
         {/* Colonne droite : Formulaire d'ajout de paiement */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 lg:p-8 sticky top-6">
-            <h3 className="font-semibold text-gray-900 mb-4 lg:mb-6">
-              Ajouter un paiement
-            </h3>
+            <h3 className="font-semibold text-gray-900 mb-4 lg:mb-6">Ajouter un paiement</h3>
             <PaymentForm
               receivableId={receivable.id}
               remainingAmount={Number(receivable.remaining_amount)}

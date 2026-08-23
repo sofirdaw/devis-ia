@@ -9,12 +9,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import { createClient } from "@/lib/supabase/client";
-import {
-  User,
-  LogOut,
-  ChevronDown,
-  Loader2,
-} from "lucide-react";
+import { User, LogOut, ChevronDown, Loader2 } from "lucide-react";
 
 interface UserMenuProps {
   className?: string;
@@ -137,9 +132,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">
-                  {fullName}
-                </p>
+                <p className="text-sm font-semibold text-gray-900 truncate">{fullName}</p>
                 <p className="text-xs text-gray-500 truncate">{email}</p>
               </div>
             </div>

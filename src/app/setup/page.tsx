@@ -39,10 +39,7 @@ export default function SetupPage() {
       <div className="w-full max-w-lg">
         {/* En-tête */}
         <div className="text-center mb-8">
-
-          <h1 className="text-2xl font-bold text-gray-900">
-            Parlez-nous de votre entreprise
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Parlez-nous de votre entreprise</h1>
           <p className="text-gray-500 text-sm mt-1">
             Ces informations apparaîtront sur vos devis et factures
           </p>
@@ -51,7 +48,10 @@ export default function SetupPage() {
         {/* Carte formulaire */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
           {state.error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 mb-5 text-sm" role="alert">
+            <div
+              className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 mb-5 text-sm"
+              role="alert"
+            >
               {state.error}
             </div>
           )}
@@ -101,9 +101,7 @@ export default function SetupPage() {
                 >
                   {logoPreview ? "Changer le logo" : "Ajouter un logo"}
                 </Button>
-                <p className="text-xs text-gray-400 mt-2">
-                  PNG ou JPG, 2 Mo maximum (optionnel)
-                </p>
+                <p className="text-xs text-gray-400 mt-2">PNG ou JPG, 2 Mo maximum (optionnel)</p>
               </div>
             </div>
 
@@ -115,12 +113,7 @@ export default function SetupPage() {
             />
 
             <div className="grid grid-cols-2 gap-4">
-              <Input
-                name="phone"
-                type="tel"
-                label="Téléphone"
-                placeholder="+226 70 00 00 00"
-              />
+              <Input name="phone" type="tel" label="Téléphone" placeholder="+226 70 00 00 00" />
               <Input
                 name="email"
                 type="email"
@@ -129,28 +122,12 @@ export default function SetupPage() {
               />
             </div>
 
-            <Input
-              name="address"
-              label="Adresse"
-              placeholder="Ouagadougou, Burkina Faso"
-            />
+            <Input name="address" label="Adresse" placeholder="Ouagadougou, Burkina Faso" />
 
             <div className="grid grid-cols-3 gap-4">
-              <Input
-                name="rccm"
-                label="RCCM"
-                placeholder="Registre du Commerce"
-              />
-              <Input
-                name="ifu"
-                label="IFU"
-                placeholder="Identifiant Fiscal"
-              />
-              <Input
-                name="cme"
-                label="CME"
-                placeholder="Centre des Métiers"
-              />
+              <Input name="rccm" label="RCCM" placeholder="Registre du Commerce" />
+              <Input name="ifu" label="IFU" placeholder="Identifiant Fiscal" />
+              <Input name="cme" label="CME" placeholder="Centre des Métiers" />
             </div>
 
             {/*<Input

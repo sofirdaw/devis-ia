@@ -65,7 +65,7 @@ export function DialogContent({
           "max-h-[85vh] flex flex-col",
           "animate-fade-in",
           SIZES[size],
-          className,
+          className
         )}
         aria-describedby="dialog-description"
       >
@@ -83,10 +83,7 @@ export function DialogContent({
                 {description}
               </RadixDialog.Description>
             ) : (
-              <RadixDialog.Description
-                id="dialog-description"
-                className="sr-only"
-              >
+              <RadixDialog.Description id="dialog-description" className="sr-only">
                 {title}
               </RadixDialog.Description>
             )}

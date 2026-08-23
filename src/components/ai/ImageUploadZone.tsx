@@ -14,7 +14,11 @@ interface ImageUploadZoneProps {
 }
 
 // Compression et redimensionnement Canvas pour l'OCR IA
-function optimizeImageForOCR(file: File, maxDimension: number = 1400, quality: number = 0.88): Promise<string> {
+function optimizeImageForOCR(
+  file: File,
+  maxDimension: number = 1400,
+  quality: number = 0.88
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -60,10 +64,7 @@ function optimizeImageForOCR(file: File, maxDimension: number = 1400, quality: n
   });
 }
 
-export function ImageUploadZone({
-  onImageReady,
-  disabled,
-}: ImageUploadZoneProps) {
+export function ImageUploadZone({ onImageReady, disabled }: ImageUploadZoneProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -109,11 +110,7 @@ export function ImageUploadZone({
     return (
       <div className="relative rounded-xl border border-gray-200 overflow-hidden bg-gray-50 shadow-inner">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={preview}
-          alt="Aperçu du document"
-          className="w-full max-h-80 object-contain"
-        />
+        <img src={preview} alt="Aperçu du document" className="w-full max-h-80 object-contain" />
         {!disabled && (
           <button
             onClick={clearImage}
@@ -160,7 +157,9 @@ export function ImageUploadZone({
         <FileImage size={26} className="text-primary-400" />
       </div>
       <p className="text-sm font-semibold text-gray-800">
-        {isProcessing ? "Optimisation de la photo en cours..." : "Prenez une photo ou glissez un document"}
+        {isProcessing
+          ? "Optimisation de la photo en cours..."
+          : "Prenez une photo ou glissez un document"}
       </p>
       <p className="text-xs text-gray-500 mt-1.5 max-w-sm mx-auto">
         Facture papier, note manuscrite, bon de commande, devis rédigé à la main... — JPG, PNG

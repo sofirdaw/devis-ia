@@ -14,13 +14,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import {
-  Sparkles,
-  AlertCircle,
-  CheckCircle2,
-  Type,
-  Camera,
-} from "lucide-react";
+import { Sparkles, AlertCircle, CheckCircle2, Type, Camera } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +29,7 @@ import { VoiceInputButton } from "./VoiceInputButton";
 import type { Client, Product } from "@/types";
 import type { LineItem } from "@/components/documents/LineItemsEditor";
 import { parseDocumentOfflineText } from "@/lib/offline-parser";
+import { extractDocumentFromImageOffline } from "@/lib/offline-ocr";
 
 interface AIGeneratorPanelProps {
   documentType: "quote" | "invoice";
@@ -67,14 +62,24 @@ export function AIGeneratorPanel({
       // Détecter si l'appareil est hors-ligne
       const isOffline = typeof window !== "undefined" && !navigator.onLine;
 
-      if (isOffline && mode === "text") {
-        const offlineResult = parseDocumentOfflineText(description, clients, products);
-        if (!offlineResult.success || !offlineResult.data) {
-          setError(offlineResult.error ?? "Impossible de parser le texte en local");
+      if (isOffline) {
+        if (mode === "text") {
+          const offlineResult = parseDocumentOfflineText(description, clients, products);
+          if (!offlineResult.success || !offlineResult.data) {
+            setError(offlineResult.error ?? "Impossible de parser le texte en local");
+            return;
+          }
+          setResult(offlineResult.data);
+          return;
+        } else if (mode === "image" && imageBase64) {
+          const ocrResult = await extractDocumentFromImageOffline(imageBase64, clients, products);
+          if (!ocrResult.success || !ocrResult.data) {
+            setError(ocrResult.error ?? "Impossible d'extraire le texte de l'image en local");
+            return;
+          }
+          setResult(ocrResult.data);
           return;
         }
-        setResult(offlineResult.data);
-        return;
       }
 
       try {
@@ -89,11 +94,17 @@ export function AIGeneratorPanel({
                 };
 
         if (!response.success || !response.data) {
-          // Fallback automatique si la requête réseau échoue en mode texte
+          // Fallback automatique si la requête réseau échoue
           if (mode === "text") {
             const fallbackResult = parseDocumentOfflineText(description, clients, products);
             if (fallbackResult.success && fallbackResult.data) {
               setResult(fallbackResult.data);
+              return;
+            }
+          } else if (mode === "image" && imageBase64) {
+            const ocrResult = await extractDocumentFromImageOffline(imageBase64, clients, products);
+            if (ocrResult.success && ocrResult.data) {
+              setResult(ocrResult.data);
               return;
             }
           }
@@ -110,8 +121,14 @@ export function AIGeneratorPanel({
             setResult(fallbackResult.data);
             return;
           }
+        } else if (mode === "image" && imageBase64) {
+          const ocrResult = await extractDocumentFromImageOffline(imageBase64, clients, products);
+          if (ocrResult.success && ocrResult.data) {
+            setResult(ocrResult.data);
+            return;
+          }
         }
-        setError("Connexion réseau indisponible. Passez en mode texte pour l'analyse locale.");
+        setError("Impossible de contacter le serveur. L'analyse locale a été tentée.");
       }
     });
   };
@@ -139,8 +156,8 @@ export function AIGeneratorPanel({
             </p>
             {!result.matchedClientId && (
               <p className="text-xs text-green-700 mt-1">
-                Client &quot;{result.clientName}&quot; introuvable — veuillez le
-                sélectionner ou le créer manuellement.
+                Client &quot;{result.clientName}&quot; introuvable — veuillez le sélectionner ou le
+                créer manuellement.
               </p>
             )}
           </div>
@@ -213,9 +230,7 @@ export function AIGeneratorPanel({
         <>
           <div className="flex justify-end mb-2">
             <VoiceInputButton
-              onTranscript={(text) =>
-                setDescription((prev) => (prev ? prev + " " + text : text))
-              }
+              onTranscript={(text) => setDescription((prev) => (prev ? prev + " " + text : text))}
               disabled={isPending}
             />
           </div>

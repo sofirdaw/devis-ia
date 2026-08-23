@@ -45,12 +45,15 @@ export function PreferencesForm({ company }: PreferencesFormProps) {
       <CardHeader className="p-4 sm:p-6 lg:p-8">
         <CardTitle>Préférences de facturation</CardTitle>
         <CardDescription>
-          Numérotation automatique et taux de TVA appliqués aux nouveaux
-          documents
+          Numérotation automatique et taux de TVA appliqués aux nouveaux documents
         </CardDescription>
       </CardHeader>
 
-      <form action={formAction} onSubmit={() => setDismissed(false)} className="p-4 sm:p-6 lg:p-8 space-y-6">
+      <form
+        action={formAction}
+        onSubmit={() => setDismissed(false)}
+        className="p-4 sm:p-6 lg:p-8 space-y-6"
+      >
         <CardBody className="p-0 space-y-4">
           {state.error && (
             <div
@@ -102,11 +105,7 @@ export function PreferencesForm({ company }: PreferencesFormProps) {
           ) : (
             <span />
           )}
-          <Button
-            type="submit"
-            isLoading={isPending}
-            className="w-full sm:w-auto"
-          >
+          <Button type="submit" isLoading={isPending} className="w-full sm:w-auto">
             Enregistrer
           </Button>
         </CardFooter>

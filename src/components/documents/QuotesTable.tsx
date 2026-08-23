@@ -6,14 +6,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import {
-  FileText,
-  Plus,
-  Sparkles,
-  Search,
-  CheckCircle,
-  Clock,
-} from "lucide-react";
+import { FileText, Plus, Sparkles, Search, CheckCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
@@ -56,22 +49,25 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
   const combinedQuotes = useMemo(() => {
     const formattedOffline: Quote[] = offlineQuotes
       .filter((off) => off.sync_status === "pending_create")
-      .map((off) => ({
-        id: off.id,
-        quote_number: `${off.quote_number} (Local 🟡)`,
-        client: { name: off.client_name || "Client Local" },
-        status: off.status,
-        total: off.total,
-        company_id: "offline_company",
-        client_id: off.client_id || "",
-        subtotal: off.subtotal,
-        tax: off.tax,
-        discount: off.discount,
-        notes: off.notes || "",
-        valid_until: null,
-        created_at: off.created_at,
-        is_offline: true,
-      } as unknown as Quote));
+      .map(
+        (off) =>
+          ({
+            id: off.id,
+            quote_number: `${off.quote_number} (Local 🟡)`,
+            client: { name: off.client_name || "Client Local" },
+            status: off.status,
+            total: off.total,
+            company_id: "offline_company",
+            client_id: off.client_id || "",
+            subtotal: off.subtotal,
+            tax: off.tax,
+            discount: off.discount,
+            notes: off.notes || "",
+            valid_until: null,
+            created_at: off.created_at,
+            is_offline: true,
+          }) as unknown as Quote
+      );
     return [...formattedOffline, ...quotes];
   }, [quotes, offlineQuotes]);
 
@@ -93,9 +89,7 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
       const matchesStatus = statusFilter === "all" || q.status === statusFilter;
       const matchesSearch =
         q.quote_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (q.client?.name ?? "")
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase());
+        (q.client?.name ?? "").toLowerCase().includes(searchQuery.toLowerCase());
       return matchesStatus && matchesSearch;
     });
   }, [combinedQuotes, statusFilter, searchQuery]);
@@ -109,12 +103,8 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
             <FileText size={20} />
           </div>
           <div>
-            <p className="text-xs sm:text-sm font-medium text-gray-500">
-              Total des Devis
-            </p>
-            <p className="text-xl sm:text-2xl font-bold text-gray-900">
-              {kpis.totalCount}
-            </p>
+            <p className="text-xs sm:text-sm font-medium text-gray-500">Total des Devis</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900">{kpis.totalCount}</p>
           </div>
         </div>
 
@@ -123,9 +113,7 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
             <CheckCircle size={20} />
           </div>
           <div>
-            <p className="text-xs sm:text-sm font-medium text-gray-500">
-              Montant Accepté
-            </p>
+            <p className="text-xs sm:text-sm font-medium text-gray-500">Montant Accepté</p>
             <p className="text-xl sm:text-2xl font-bold text-green-600 font-mono">
               {formatCurrency(kpis.acceptedAmount)}
             </p>
@@ -137,9 +125,7 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
             <Clock size={20} />
           </div>
           <div>
-            <p className="text-xs sm:text-sm font-medium text-gray-500">
-              Montant en Cours
-            </p>
+            <p className="text-xs sm:text-sm font-medium text-gray-500">Montant en Cours</p>
             <p className="text-xl sm:text-2xl font-bold text-gray-900 font-mono">
               {formatCurrency(kpis.pendingAmount)}
             </p>
@@ -198,9 +184,7 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
       {filteredQuotes.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 py-12 lg:py-16 text-center shadow-sm">
           <FileText size={32} className="text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm font-medium">
-            Aucun devis trouvé
-          </p>
+          <p className="text-gray-500 text-sm font-medium">Aucun devis trouvé</p>
           <p className="text-gray-400 text-xs mt-1">
             Essayez d&apos;ajuster vos critères de recherche ou de filtre
           </p>
@@ -230,10 +214,7 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
               </thead>
               <tbody className="divide-y divide-gray-150">
                 {filteredQuotes.map((quote) => (
-                  <tr
-                    key={quote.id}
-                    className="hover:bg-gray-50/50 transition-colors"
-                  >
+                  <tr key={quote.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-5 py-4">
                       <Link
                         href={`/quotes/${quote.id}`}

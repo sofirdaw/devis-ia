@@ -29,13 +29,11 @@ async function getCurrentCompanyId(): Promise<string | null> {
 
 export async function createProductAction(
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const supplierIdRaw = formData.get("supplier_id");
   const supplier_id =
-    typeof supplierIdRaw === "string" && supplierIdRaw.trim()
-      ? supplierIdRaw
-      : undefined;
+    typeof supplierIdRaw === "string" && supplierIdRaw.trim() ? supplierIdRaw : undefined;
 
   const parsed = ProductSchema.safeParse({
     name: formData.get("name"),
@@ -71,13 +69,11 @@ export async function createProductAction(
 export async function updateProductAction(
   productId: string,
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const supplierIdRaw = formData.get("supplier_id");
   const supplier_id =
-    typeof supplierIdRaw === "string" && supplierIdRaw.trim()
-      ? supplierIdRaw
-      : undefined;
+    typeof supplierIdRaw === "string" && supplierIdRaw.trim() ? supplierIdRaw : undefined;
 
   const parsed = ProductSchema.safeParse({
     name: formData.get("name"),
@@ -113,9 +109,7 @@ export async function updateProductAction(
 
 // ── DELETE ───────────────────────────────────────────────────────────────────
 
-export async function deleteProductAction(
-  productId: string,
-): Promise<ActionResult> {
+export async function deleteProductAction(productId: string): Promise<ActionResult> {
   const companyId = await getCurrentCompanyId();
   if (!companyId) return { error: "Entreprise introuvable" };
 

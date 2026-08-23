@@ -13,11 +13,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-export default async function EditQuotePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function EditQuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   const company = await requireCurrentCompany();
@@ -34,16 +30,8 @@ export default async function EditQuotePage({
   if (quote.status !== "draft") redirect(`/quotes/${id}`);
 
   const [{ data: clients }, { data: products }] = await Promise.all([
-    supabase
-      .from("clients")
-      .select("*")
-      .eq("company_id", company.id)
-      .order("name"),
-    supabase
-      .from("products")
-      .select("*")
-      .eq("company_id", company.id)
-      .order("name"),
+    supabase.from("clients").select("*").eq("company_id", company.id).order("name"),
+    supabase.from("products").select("*").eq("company_id", company.id).order("name"),
   ]);
 
   return (

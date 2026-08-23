@@ -12,11 +12,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-export default async function EditInvoicePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function EditInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   const company = await requireCurrentCompany();
@@ -33,16 +29,8 @@ export default async function EditInvoicePage({
   if (invoice.status !== "draft") redirect(`/invoices/${id}`);
 
   const [{ data: clients }, { data: products }] = await Promise.all([
-    supabase
-      .from("clients")
-      .select("*")
-      .eq("company_id", company.id)
-      .order("name"),
-    supabase
-      .from("products")
-      .select("*")
-      .eq("company_id", company.id)
-      .order("name"),
+    supabase.from("clients").select("*").eq("company_id", company.id).order("name"),
+    supabase.from("products").select("*").eq("company_id", company.id).order("name"),
   ]);
 
   return (

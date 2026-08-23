@@ -14,10 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DocumentPDF, type PDFDocumentData } from "@/components/pdf/DocumentPDF";
 import type { Quote } from "@/types";
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
@@ -49,9 +46,9 @@ export async function GET(
     // Si c'est déjà une URL complète, on la garde
     // Sinon, on génère une URL publique depuis Supabase
   } else if (logoUrl) {
-    const { data: { publicUrl } } = await supabase.storage
-      .from("logos")
-      .getPublicUrl(logoUrl);
+    const {
+      data: { publicUrl },
+    } = await supabase.storage.from("logos").getPublicUrl(logoUrl);
     logoUrl = publicUrl;
   }
 

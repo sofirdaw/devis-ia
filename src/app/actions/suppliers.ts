@@ -15,7 +15,7 @@ import type { SupplierInsert } from "@/types";
 
 export async function createSupplierAction(
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const supabase = await createClient();
 
@@ -100,7 +100,7 @@ export async function createQuickSupplierAction(
 export async function updateSupplierAction(
   _prevState: ActionResult,
   formData: FormData,
-  supplierId: string,
+  supplierId: string
 ): Promise<ActionResult> {
   const supabase = await createClient();
 
@@ -138,9 +138,7 @@ export async function updateSupplierAction(
   redirect(`/suppliers/${supplierId}`);
 }
 
-export async function deleteSupplierAction(
-  supplierId: string,
-): Promise<ActionResult> {
+export async function deleteSupplierAction(supplierId: string): Promise<ActionResult> {
   const supabase = await createClient();
 
   const company = await getCurrentCompanyForAction();

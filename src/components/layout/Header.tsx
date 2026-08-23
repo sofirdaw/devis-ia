@@ -27,9 +27,7 @@ export function Header({ title, description, actions, backButton }: HeaderProps)
           {backButton}
           <div>
             <h1 className="text-lg sm:text-xl font-semibold text-gray-900">{title}</h1>
-            {description && (
-              <div className="text-sm text-gray-500 mt-0.5">{description}</div>
-            )}
+            {description && <div className="text-sm text-gray-500 mt-0.5">{description}</div>}
           </div>
         </div>
 

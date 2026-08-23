@@ -64,9 +64,7 @@ function LoginForm() {
           IA
         </div>
         <h1 className="text-2xl font-bold text-gray-900">Connexion</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Connectez-vous à votre compte Devis IA
-        </p>
+        <p className="text-sm text-gray-500 mt-1">Connectez-vous à votre compte Devis IA</p>
       </div>
 
       {/* Bouton Google */}
@@ -115,9 +113,7 @@ function LoginForm() {
       {/* Formulaire Email / Password */}
       <form onSubmit={handleEmailLogin} className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">
-            Email
-          </label>
+          <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Email</label>
           <input
             type="email"
             name="email"
@@ -165,10 +161,7 @@ function LoginForm() {
 
       <div className="mt-6 text-center text-sm text-gray-500">
         Vous n&apos;avez pas de compte ?{" "}
-        <Link
-          href="/register"
-          className="font-medium text-primary-600 hover:text-primary-500"
-        >
+        <Link href="/register" className="font-medium text-primary-600 hover:text-primary-500">
           Créer un compte
         </Link>
       </div>

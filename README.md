@@ -14,7 +14,7 @@ Application web moderne de gestion de devis et factures avec intelligence artifi
 
 ## 📋 Prérequis
 
-- Node.js 20+ 
+- Node.js 20+
 - npm ou yarn
 - Un compte Supabase (gratuit)
 - Un compte Clerk (gratuit)
@@ -173,6 +173,7 @@ npm run lint     # Exécute ESLint
 ### Autres plateformes
 
 L'application peut être déployée sur n'importe quelle plateforme supportant Next.js :
+
 - Netlify
 - Railway
 - Render
@@ -189,6 +190,7 @@ Ce projet est sous licence MIT.
 ## 🆘 Support
 
 Pour toute question ou problème :
+
 - Ouvrez une issue sur GitHub
 - Consultez la documentation Next.js
 - Consultez la documentation Supabase

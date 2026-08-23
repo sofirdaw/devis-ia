@@ -101,10 +101,7 @@ export type Quote = {
   quote_items?: QuoteItem[];
 };
 
-export type QuoteInsert = Omit<
-  Quote,
-  "id" | "created_at" | "client" | "quote_items"
->;
+export type QuoteInsert = Omit<Quote, "id" | "created_at" | "client" | "quote_items">;
 
 export type QuoteItem = {
   id: string;
@@ -138,10 +135,7 @@ export type Invoice = {
   // Relations
   client?: Client;
   invoice_items?: InvoiceItem[];
-  receivable?: Pick<
-    Receivable,
-    "id" | "paid_amount" | "remaining_amount" | "status"
-  > | null;
+  receivable?: Pick<Receivable, "id" | "paid_amount" | "remaining_amount" | "status"> | null;
 };
 
 export type InvoiceInsert = Omit<
@@ -207,10 +201,7 @@ export type PaymentTransaction = {
   created_at: string;
 };
 
-export type PaymentTransactionInsert = Omit<
-  PaymentTransaction,
-  "id" | "created_at"
->;
+export type PaymentTransactionInsert = Omit<PaymentTransaction, "id" | "created_at">;
 
 // ─── IA ────────────────────────────────────────────────────────────────────────
 

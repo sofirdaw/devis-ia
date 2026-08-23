@@ -11,11 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Pencil, Phone, Mail, MapPin, ArrowLeft } from "lucide-react";
 import type { Supplier } from "@/types";
 
-export default async function SupplierDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function SupplierDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const company = await requireCurrentCompany();
   const supabase = await createClient();
@@ -37,11 +33,7 @@ export default async function SupplierDetailPage({
       <div className="page-container max-w-3xl">
         <div className="mb-4">
           <Link href="/suppliers">
-            <Button
-              variant="ghost"
-              size="sm"
-              leftIcon={<ArrowLeft size={14} />}
-            >
+            <Button variant="ghost" size="sm" leftIcon={<ArrowLeft size={14} />}>
               Retour aux fournisseurs
             </Button>
           </Link>
@@ -50,9 +42,7 @@ export default async function SupplierDetailPage({
         <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 lg:p-8">
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Informations de contact
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Informations de contact</h3>
               <div className="space-y-3">
                 {typedSupplier.phone && (
                   <div className="flex items-center gap-3 text-gray-600 min-w-0">
@@ -68,10 +58,7 @@ export default async function SupplierDetailPage({
                 )}
                 {typedSupplier.address && (
                   <div className="flex items-start gap-3 text-gray-600 min-w-0">
-                    <MapPin
-                      size={18}
-                      className="text-gray-400 shrink-0 mt-0.5"
-                    />
+                    <MapPin size={18} className="text-gray-400 shrink-0 mt-0.5" />
                     <span className="break-words">{typedSupplier.address}</span>
                   </div>
                 )}

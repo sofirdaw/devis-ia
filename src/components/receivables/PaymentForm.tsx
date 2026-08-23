@@ -25,13 +25,19 @@ export function PaymentForm({ receivableId, remainingAmount }: PaymentFormProps)
       <input type="hidden" name="receivableId" value={receivableId} />
 
       {state.error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm" role="alert">
+        <div
+          className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"
+          role="alert"
+        >
           {state.error}
         </div>
       )}
 
       {state.success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 text-sm" role="alert">
+        <div
+          className="bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 text-sm"
+          role="alert"
+        >
           Paiement ajouté avec succès
         </div>
       )}
@@ -65,12 +71,7 @@ export function PaymentForm({ receivableId, remainingAmount }: PaymentFormProps)
         </select>
       </div>
 
-      <Input
-        name="payment_date"
-        type="date"
-        label="Date de paiement"
-        required
-      />
+      <Input name="payment_date" type="date" label="Date de paiement" required />
 
       <Input
         name="reference"
@@ -78,11 +79,7 @@ export function PaymentForm({ receivableId, remainingAmount }: PaymentFormProps)
         placeholder="Ex: Réf banque, numéro de chèque"
       />
 
-      <Input
-        name="notes"
-        label="Notes (optionnel)"
-        placeholder="Détails supplémentaires"
-      />
+      <Input name="notes" label="Notes (optionnel)" placeholder="Détails supplémentaires" />
 
       <Button type="submit" size="lg" isLoading={isPending} className="w-full">
         {isPending ? "Enregistrement..." : "Enregistrer le paiement"}

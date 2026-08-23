@@ -14,7 +14,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     const supabase = createClient();
 
     const loadUserAndCompany = async () => {
-      // Accès aux setters via getState() pour éviter les dépendances réactives
+      // Si l'appareil est hors-ligne, conserver la session locale déjà hydratée depuis localStorage
+      if (typeof window !== "undefined" && !navigator.onLine) {
+        useAuthStore.getState().setLoading(false);
+        return;
+      }
+
       const { setUser, setCompany, setLoading } = useAuthStore.getState();
       setLoading(true);
 
@@ -25,8 +30,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         } = await supabase.auth.getUser();
 
         if (userError || !user) {
-          useAuthStore.getState().setUser(null);
-          useAuthStore.getState().setCompany(null);
+          // Ne réinitialiser QUE si l'erreur n'est pas un problème de connectivité réseau
+          if (navigator.onLine && !useAuthStore.getState().user) {
+            useAuthStore.getState().setUser(null);
+            useAuthStore.getState().setCompany(null);
+          }
           useAuthStore.getState().setLoading(false);
           return;
         }
@@ -41,14 +49,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
         if (companyError) {
           console.error("Erreur chargement entreprise:", companyError.message);
-          setCompany(null);
-        } else {
-          setCompany(company ?? null);
+        } else if (company) {
+          setCompany(company);
         }
       } catch (error) {
-        console.error("Erreur chargement utilisateur:", error);
-        useAuthStore.getState().setUser(null);
-        useAuthStore.getState().setCompany(null);
+        console.warn(
+          "Réseau indisponible pour vérifier l'utilisateur, utilisation du cache local:",
+          error
+        );
+        // Conserver les données locales en cas d'erreur de connexion
       } finally {
         useAuthStore.getState().setLoading(false);
       }

@@ -6,15 +6,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import {
-  Receipt,
-  Plus,
-  AlertCircle,
-  Sparkles,
-  Search,
-  CheckCircle,
-  Clock,
-} from "lucide-react";
+import { Receipt, Plus, AlertCircle, Sparkles, Search, CheckCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
@@ -35,9 +27,7 @@ const STATUS_FILTERS: { value: InvoiceStatus | "all"; label: string }[] = [
 ];
 
 export function InvoicesTable({ invoices }: InvoicesTableProps) {
-  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "all">(
-    "all",
-  );
+  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [offlineInvoices, setOfflineInvoices] = useState<OfflineInvoice[]>([]);
 
@@ -59,24 +49,27 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
   const combinedInvoices = useMemo(() => {
     const formattedOffline: Invoice[] = offlineInvoices
       .filter((off) => off.sync_status === "pending_create")
-      .map((off) => ({
-        id: off.id,
-        invoice_number: `${off.invoice_number} (Local 🟡)`,
-        client: { name: off.client_name || "Client Local" } as unknown as Client,
-        company_id: "offline_company",
-        client_id: off.client_id || "",
-        status: off.status,
-        total: off.total,
-        subtotal: off.subtotal,
-        tax: off.tax,
-        discount: off.discount,
-        notes: off.notes || "",
-        due_date: off.due_date || null,
-        paid_at: null,
-        created_at: off.created_at,
-        receivable: null,
-        is_offline: true,
-      } as unknown as Invoice));
+      .map(
+        (off) =>
+          ({
+            id: off.id,
+            invoice_number: `${off.invoice_number} (Local 🟡)`,
+            client: { name: off.client_name || "Client Local" } as unknown as Client,
+            company_id: "offline_company",
+            client_id: off.client_id || "",
+            status: off.status,
+            total: off.total,
+            subtotal: off.subtotal,
+            tax: off.tax,
+            discount: off.discount,
+            notes: off.notes || "",
+            due_date: off.due_date || null,
+            paid_at: null,
+            created_at: off.created_at,
+            receivable: null,
+            is_offline: true,
+          }) as unknown as Invoice
+      );
     return [...formattedOffline, ...invoices];
   }, [invoices, offlineInvoices]);
 
@@ -102,9 +95,7 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
       const matchesStatus = statusFilter === "all" || i.status === statusFilter;
       const matchesSearch =
         i.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (i.client?.name ?? "")
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase());
+        (i.client?.name ?? "").toLowerCase().includes(searchQuery.toLowerCase());
       return matchesStatus && matchesSearch;
     });
   }, [combinedInvoices, statusFilter, searchQuery]);
@@ -118,12 +109,8 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
             <Receipt size={20} />
           </div>
           <div>
-            <p className="text-xs sm:text-sm font-medium text-gray-500">
-              Total des Factures
-            </p>
-            <p className="text-xl sm:text-2xl font-bold text-gray-900">
-              {kpis.totalCount}
-            </p>
+            <p className="text-xs sm:text-sm font-medium text-gray-500">Total des Factures</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900">{kpis.totalCount}</p>
           </div>
         </div>
 
@@ -132,9 +119,7 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
             <CheckCircle size={20} />
           </div>
           <div>
-            <p className="text-xs sm:text-sm font-medium text-gray-500">
-              Montant Encaissé (Payé)
-            </p>
+            <p className="text-xs sm:text-sm font-medium text-gray-500">Montant Encaissé (Payé)</p>
             <p className="text-xl sm:text-2xl font-bold text-green-600 font-mono">
               {formatCurrency(kpis.paidAmount)}
             </p>
@@ -207,9 +192,7 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
       {filteredInvoices.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 py-12 lg:py-16 text-center shadow-sm">
           <Receipt size={32} className="text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm font-medium">
-            Aucune facture trouvée
-          </p>
+          <p className="text-gray-500 text-sm font-medium">Aucune facture trouvée</p>
           <p className="text-gray-400 text-xs mt-1">
             Essayez d&apos;ajuster vos critères de recherche ou de filtre
           </p>
@@ -239,10 +222,7 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
               </thead>
               <tbody className="divide-y divide-gray-150">
                 {filteredInvoices.map((invoice) => (
-                  <tr
-                    key={invoice.id}
-                    className="hover:bg-gray-50/50 transition-colors"
-                  >
+                  <tr key={invoice.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-5 py-4">
                       <Link
                         href={`/invoices/${invoice.id}`}
@@ -266,20 +246,13 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
                       <StatusBadge status={invoice.status} />
                     </td>
                     <td className="px-5 py-4 text-right font-mono">
-                      <div className="font-bold text-gray-900">
-                        {formatCurrency(invoice.total)}
-                      </div>
-                      {invoice.receivable &&
-                        invoice.receivable.status === "partial" && (
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            Payé{" "}
-                            {formatCurrency(invoice.receivable.paid_amount)} ·
-                            Reste{" "}
-                            {formatCurrency(
-                              invoice.receivable.remaining_amount,
-                            )}
-                          </div>
-                        )}
+                      <div className="font-bold text-gray-900">{formatCurrency(invoice.total)}</div>
+                      {invoice.receivable && invoice.receivable.status === "partial" && (
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          Payé {formatCurrency(invoice.receivable.paid_amount)} · Reste{" "}
+                          {formatCurrency(invoice.receivable.remaining_amount)}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

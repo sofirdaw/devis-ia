@@ -38,11 +38,7 @@ const EMPTY_ITEM: LineItem = {
   unit_price: 0,
 };
 
-export function LineItemsEditor({
-  items,
-  onChange,
-  products,
-}: LineItemsEditorProps) {
+export function LineItemsEditor({ items, onChange, products }: LineItemsEditorProps) {
   const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
 
   const addItem = () => {
@@ -54,9 +50,7 @@ export function LineItemsEditor({
   };
 
   const updateItem = (index: number, updates: Partial<LineItem>) => {
-    onChange(
-      items.map((item, i) => (i === index ? { ...item, ...updates } : item)),
-    );
+    onChange(items.map((item, i) => (i === index ? { ...item, ...updates } : item)));
   };
 
   // Quand l'utilisateur sélectionne un produit existant dans la liste suggérée
@@ -84,7 +78,7 @@ export function LineItemsEditor({
       {items.map((item, index) => {
         // Filtrer les suggestions selon la saisie
         const suggestions = products.filter((p) =>
-          p.name.toLowerCase().includes(item.designation.toLowerCase()),
+          p.name.toLowerCase().includes(item.designation.toLowerCase())
         );
 
         return (
@@ -107,10 +101,7 @@ export function LineItemsEditor({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    if (
-                      index === items.length - 1 &&
-                      item.designation.trim() !== ""
-                    ) {
+                    if (index === items.length - 1 && item.designation.trim() !== "") {
                       addItem();
                     }
                   }
@@ -130,9 +121,7 @@ export function LineItemsEditor({
                       className="w-full text-left px-3 py-2.5 hover:bg-blue-50 hover:text-blue-600 transition-colors flex justify-between items-center"
                     >
                       <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {p.name}
-                        </div>
+                        <div className="text-sm font-medium text-gray-900">{p.name}</div>
                         {p.description && (
                           <div className="text-xs text-gray-500 truncate max-w-50">
                             {p.description}

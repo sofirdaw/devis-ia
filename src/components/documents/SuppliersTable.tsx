@@ -95,11 +95,7 @@ export function SuppliersTable({ suppliers }: SuppliersTableProps) {
                   <td className="px-4 sm:px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Link href={`/suppliers/${supplier.id}/edit`}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          leftIcon={<Pencil size={14} />}
-                        >
+                        <Button variant="ghost" size="sm" leftIcon={<Pencil size={14} />}>
                           Modifier
                         </Button>
                       </Link>

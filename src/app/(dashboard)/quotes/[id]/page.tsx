@@ -17,11 +17,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-export default async function QuoteDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const company = await requireCurrentCompany();
   const supabase = await createClient();
@@ -56,10 +52,7 @@ export default async function QuoteDetailPage({
             </Link>
             <PrintButton pdfUrl={`/api/pdf/quote/${typedQuote.id}`} />
             <DownloadPdfButton type="quote" documentId={typedQuote.id} />
-            <QuoteDetailActions
-              quoteId={typedQuote.id}
-              currentStatus={typedQuote.status}
-            />
+            <QuoteDetailActions quoteId={typedQuote.id} currentStatus={typedQuote.status} />
           </div>
         }
       />
@@ -83,16 +76,12 @@ export default async function QuoteDetailPage({
           {/* Infos client */}
           <div className="border-t border-b border-gray-100 py-4 mb-6">
             <p className="text-xs text-gray-500 mb-1">Client</p>
-            <p className="font-medium text-gray-900">
-              {typedQuote.client?.name}
-            </p>
+            <p className="font-medium text-gray-900">{typedQuote.client?.name}</p>
             {typedQuote.client?.phone && (
               <p className="text-sm text-gray-500">{typedQuote.client.phone}</p>
             )}
             {typedQuote.client?.address && (
-              <p className="text-sm text-gray-500">
-                {typedQuote.client.address}
-              </p>
+              <p className="text-sm text-gray-500">{typedQuote.client.address}</p>
             )}
           </div>
 
@@ -111,9 +100,7 @@ export default async function QuoteDetailPage({
                 {typedQuote.quote_items?.map((item) => (
                   <tr key={item.id}>
                     <td className="py-2.5 text-gray-900">{item.designation}</td>
-                    <td className="py-2.5 text-right text-gray-600">
-                      {item.quantity}
-                    </td>
+                    <td className="py-2.5 text-right text-gray-600">{item.quantity}</td>
                     <td className="py-2.5 text-right text-gray-600">
                       {formatCurrency(item.unit_price)}
                     </td>
@@ -131,24 +118,18 @@ export default async function QuoteDetailPage({
             <div className="w-full sm:w-64 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Sous-total</span>
-                <span className="text-gray-900">
-                  {formatCurrency(typedQuote.subtotal)}
-                </span>
+                <span className="text-gray-900">{formatCurrency(typedQuote.subtotal)}</span>
               </div>
               {typedQuote.discount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Remise</span>
-                  <span className="text-gray-900">
-                    -{formatCurrency(typedQuote.discount)}
-                  </span>
+                  <span className="text-gray-900">-{formatCurrency(typedQuote.discount)}</span>
                 </div>
               )}
               {typedQuote.tax > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">TVA</span>
-                  <span className="text-gray-900">
-                    {formatCurrency(typedQuote.tax)}
-                  </span>
+                  <span className="text-gray-900">{formatCurrency(typedQuote.tax)}</span>
                 </div>
               )}
               <div className="flex justify-between pt-2 border-t border-gray-200">

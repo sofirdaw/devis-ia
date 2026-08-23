@@ -47,7 +47,7 @@ function isRetryableNetworkError(error: unknown): boolean {
 async function fetchWithRetry(
   url: string | URL | Request,
   options: RequestInit = {},
-  attempt = 1,
+  attempt = 1
 ): Promise<Response> {
   try {
     return await fetch(url, {
@@ -55,10 +55,7 @@ async function fetchWithRetry(
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   } catch (error) {
-    console.error(
-      `Supabase fetch error (attempt ${attempt}/${MAX_RETRIES + 1}):`,
-      error,
-    );
+    console.error(`Supabase fetch error (attempt ${attempt}/${MAX_RETRIES + 1}):`, error);
 
     if (attempt <= MAX_RETRIES && isRetryableNetworkError(error)) {
       const delay = RETRY_DELAY_MS * attempt;
@@ -85,7 +82,7 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
+              cookieStore.set(name, value, options)
             );
           } catch {
             // setAll appelé depuis un Server Component — ignoré
@@ -95,6 +92,6 @@ export async function createClient() {
       global: {
         fetch: (url, options) => fetchWithRetry(url, options),
       },
-    },
+    }
   );
 }

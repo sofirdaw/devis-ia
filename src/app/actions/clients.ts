@@ -34,7 +34,7 @@ async function getCurrentCompanyId(): Promise<string | null> {
 
 export async function createClientAction(
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const parsed = ClientSchema.safeParse({
     name: formData.get("name"),
@@ -73,7 +73,7 @@ export async function createClientAction(
 export async function updateClientAction(
   clientId: string,
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const parsed = ClientSchema.safeParse({
     name: formData.get("name"),
@@ -105,9 +105,7 @@ export async function updateClientAction(
 
 // ── DELETE ───────────────────────────────────────────────────────────────────
 
-export async function deleteClientAction(
-  clientId: string,
-): Promise<ActionResult> {
+export async function deleteClientAction(clientId: string): Promise<ActionResult> {
   const supabase = await createClient();
 
   // Empêcher la suppression si le client a des devis/factures liés

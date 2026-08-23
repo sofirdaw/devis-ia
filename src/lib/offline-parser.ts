@@ -131,7 +131,9 @@ function parseSingleItem(
   }
 
   // Recherche du prix (nombres à la fin de la ligne ou précédés de 'à', 'au prix de', 'à 45000', etc.)
-  const priceMatch = cleanLine.match(/(?:à|au prix de|:|=|@)?\s*(\d[\d\s]*)\s*(?:fcfa|f|cfa|\$|€|francs?)?/i);
+  const priceMatch = cleanLine.match(
+    /(?:à|au prix de|:|=|@)?\s*(\d[\d\s]*)\s*(?:fcfa|f|cfa|\$|€|francs?)?/i
+  );
   let unitPrice = 0;
 
   if (priceMatch) {
@@ -153,9 +155,7 @@ function parseSingleItem(
   if (!designation || designation.length < 2) return;
 
   // Tenter un matching avec le catalogue produit existant
-  const matchedProduct = products.find(
-    (p) => p.name.toLowerCase() === designation.toLowerCase()
-  );
+  const matchedProduct = products.find((p) => p.name.toLowerCase() === designation.toLowerCase());
 
   items.push({
     product_id: matchedProduct?.id ?? null,

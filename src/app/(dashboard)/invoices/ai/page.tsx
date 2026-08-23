@@ -16,16 +16,8 @@ export default async function InvoiceAIPage() {
   const supabase = await createClient();
 
   const [{ data: clients }, { data: products }] = await Promise.all([
-    supabase
-      .from("clients")
-      .select("*")
-      .eq("company_id", company.id)
-      .order("name"),
-    supabase
-      .from("products")
-      .select("*")
-      .eq("company_id", company.id)
-      .order("name"),
+    supabase.from("clients").select("*").eq("company_id", company.id).order("name"),
+    supabase.from("products").select("*").eq("company_id", company.id).order("name"),
   ]);
 
   return (

@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+build
+coverage
+dist
+package-lock.json
+public/sw.js
+.eslint-report.txt
+*.log

@@ -24,11 +24,7 @@ export default async function ProductsPage() {
         .select("*, supplier:suppliers(*)")
         .eq("company_id", company.id)
         .order("name"),
-      supabase
-        .from("suppliers")
-        .select("*")
-        .eq("company_id", company.id)
-        .order("name"),
+      supabase.from("suppliers").select("*").eq("company_id", company.id).order("name"),
     ]);
 
     if (prodRes.status === "fulfilled" && prodRes.value.data) {
@@ -60,10 +56,7 @@ export default async function ProductsPage() {
         }
       />
       <div className="page-container">
-        <ProductsTable
-          initialProducts={products}
-          suppliers={suppliers}
-        />
+        <ProductsTable initialProducts={products} suppliers={suppliers} />
       </div>
     </>
   );

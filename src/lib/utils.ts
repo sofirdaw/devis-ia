@@ -86,10 +86,7 @@ export function calculateTotals(
   taxRate: number = 0,
   discountAmount: number = 0
 ) {
-  const subtotal = items.reduce(
-    (sum, item) => sum + item.quantity * item.unit_price,
-    0
-  );
+  const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
   const afterDiscount = subtotal - discountAmount;
   const tax = afterDiscount * (taxRate / 100);
   const total = afterDiscount + tax;

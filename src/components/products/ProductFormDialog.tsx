@@ -12,10 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { SupplierQuickCreateDialog } from "@/components/suppliers/SupplierQuickCreateDialog";
-import {
-  createProductAction,
-  updateProductAction,
-} from "@/app/actions/products";
+import { createProductAction, updateProductAction } from "@/app/actions/products";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Product, Supplier } from "@/types";
 
@@ -43,9 +40,7 @@ export function ProductFormDialog({
   const selectedSupplierId = customSupplierId ?? product?.supplier_id ?? "";
   const supplierList = [...initialSuppliers, ...extraSuppliers];
 
-  const action = isEditMode
-    ? updateProductAction.bind(null, product.id)
-    : createProductAction;
+  const action = isEditMode ? updateProductAction.bind(null, product.id) : createProductAction;
 
   const [state, formAction, isPending] = useActionState(action, initialState);
 
@@ -141,11 +136,7 @@ export function ProductFormDialog({
               >
                 Annuler
               </Button>
-              <Button
-                type="submit"
-                isLoading={isPending}
-                className="w-full sm:w-auto"
-              >
+              <Button type="submit" isLoading={isPending} className="w-full sm:w-auto">
                 {isEditMode ? "Enregistrer" : "Ajouter"}
               </Button>
             </div>

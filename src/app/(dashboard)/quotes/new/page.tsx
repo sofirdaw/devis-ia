@@ -20,16 +20,8 @@ export default async function NewQuotePage() {
   try {
     const supabase = await createClient();
     const [clientsRes, productsRes] = await Promise.allSettled([
-      supabase
-        .from("clients")
-        .select("*")
-        .eq("company_id", company.id)
-        .order("name"),
-      supabase
-        .from("products")
-        .select("*")
-        .eq("company_id", company.id)
-        .order("name"),
+      supabase.from("clients").select("*").eq("company_id", company.id).order("name"),
+      supabase.from("products").select("*").eq("company_id", company.id).order("name"),
     ]);
 
     if (clientsRes.status === "fulfilled" && clientsRes.value.data) {

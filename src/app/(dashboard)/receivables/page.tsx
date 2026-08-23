@@ -46,9 +46,7 @@ export default async function ReceivablesPage() {
         }
       />
       <div className="page-container">
-        <ReceivablesTable
-          initialReceivables={receivables}
-        />
+        <ReceivablesTable initialReceivables={receivables} />
       </div>
     </>
   );

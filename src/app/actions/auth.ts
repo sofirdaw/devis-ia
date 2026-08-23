@@ -114,8 +114,7 @@ export async function registerAction(
   } catch (error) {
     unstable_rethrow(error);
     console.error("Registration error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Erreur inconnue";
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
     return { error: `Erreur: ${errorMessage}` };
   }
 }
@@ -153,8 +152,7 @@ export async function forgotPasswordAction(
     return { success: true };
   } catch (error) {
     console.error("Forgot password action error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Erreur inconnue";
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
     return { error: `Erreur: ${errorMessage}` };
   }
 }
@@ -190,8 +188,7 @@ export async function resetPasswordAction(
   } catch (error) {
     unstable_rethrow(error);
     console.error("Reset password action error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Erreur inconnue";
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
     return { error: `Erreur: ${errorMessage}` };
   }
 }
@@ -203,4 +200,3 @@ export async function logoutAction(): Promise<void> {
   await supabase.auth.signOut();
   redirect("/login");
 }
-

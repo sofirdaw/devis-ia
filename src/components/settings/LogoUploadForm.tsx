@@ -8,13 +8,7 @@
 import { useState, useRef, useTransition } from "react";
 import { Building2, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardBody,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardBody } from "@/components/ui/card";
 import { uploadCompanyLogoAction } from "@/app/actions/company";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -24,7 +18,11 @@ interface LogoUploadFormProps {
 }
 
 // Fonction de compression d'image côté client (Canvas)
-async function compressImageFile(file: File, maxWidth: number = 800, quality: number = 0.85): Promise<File> {
+async function compressImageFile(
+  file: File,
+  maxWidth: number = 800,
+  quality: number = 0.85
+): Promise<File> {
   return new Promise((resolve) => {
     if (!file.type.startsWith("image/")) {
       resolve(file);
@@ -78,10 +76,7 @@ async function compressImageFile(file: File, maxWidth: number = 800, quality: nu
   });
 }
 
-export function LogoUploadForm({
-  companyId,
-  currentLogoUrl,
-}: LogoUploadFormProps) {
+export function LogoUploadForm({ companyId, currentLogoUrl }: LogoUploadFormProps) {
   const [preview, setPreview] = useState<string | null>(currentLogoUrl);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);

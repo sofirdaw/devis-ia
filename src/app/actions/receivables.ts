@@ -29,7 +29,7 @@ async function getCurrentCompany() {
 
 export async function addPaymentAction(
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const receivableId = formData.get("receivableId") as string;
 
@@ -76,9 +76,7 @@ export async function addPaymentAction(
     notes: parsed.data.notes ?? null,
   };
 
-  const { error } = await supabase
-    .from("payment_transactions")
-    .insert(paymentData);
+  const { error } = await supabase.from("payment_transactions").insert(paymentData);
 
   if (error) {
     console.error("Supabase error:", error);
@@ -113,10 +111,7 @@ export async function deletePaymentAction(formData: FormData): Promise<void> {
   }
 
   // Supprimer le paiement (le trigger mettra à jour la créance automatiquement)
-  const { error } = await supabase
-    .from("payment_transactions")
-    .delete()
-    .eq("id", paymentId);
+  const { error } = await supabase.from("payment_transactions").delete().eq("id", paymentId);
 
   if (error) throw new Error("Erreur lors de la suppression du paiement");
 
@@ -129,7 +124,7 @@ export async function deletePaymentAction(formData: FormData): Promise<void> {
 export async function updateReceivableAction(
   receivableId: string,
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const dueDate = formData.get("due_date") as string | null;
   const totalAmount = parseFloat(formData.get("total_amount") as string);
@@ -180,9 +175,7 @@ export async function updateReceivableAction(
 
 // ── DELETE RECEIVABLE ───────────────────────────────────────────────────────────
 
-export async function deleteReceivableAction(
-  receivableId: string,
-): Promise<ActionResult> {
+export async function deleteReceivableAction(receivableId: string): Promise<ActionResult> {
   const company = await getCurrentCompany();
   if (!company) return { error: "Entreprise introuvable" };
 
@@ -208,15 +201,11 @@ export async function deleteReceivableAction(
 
   if ((paymentCount ?? 0) > 0) {
     return {
-      error:
-        "Impossible de supprimer : des paiements sont associés à cette créance",
+      error: "Impossible de supprimer : des paiements sont associés à cette créance",
     };
   }
 
-  const { error } = await supabase
-    .from("receivables")
-    .delete()
-    .eq("id", receivableId);
+  const { error } = await supabase.from("receivables").delete().eq("id", receivableId);
 
   if (error) {
     console.error("Supabase error:", error);
@@ -246,17 +235,14 @@ export async function getReceivableStats() {
 
   const totalAmount = stats.reduce((sum, r) => sum + Number(r.total_amount), 0);
   const totalPaid = stats.reduce((sum, r) => sum + Number(r.paid_amount), 0);
-  const totalRemaining = stats.reduce(
-    (sum, r) => sum + Number(r.remaining_amount),
-    0,
-  );
+  const totalRemaining = stats.reduce((sum, r) => sum + Number(r.remaining_amount), 0);
 
   const byStatus = stats.reduce(
     (acc, r) => {
       acc[r.status] = (acc[r.status] || 0) + 1;
       return acc;
     },
-    {} as Record<string, number>,
+    {} as Record<string, number>
   );
 
   return {

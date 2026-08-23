@@ -38,10 +38,7 @@ export default async function SettingsPage() {
         }
       />
       <div className="page-container max-w-2xl space-y-6">
-        <LogoUploadForm
-          companyId={typedCompany.id}
-          currentLogoUrl={typedCompany.logo_url}
-        />
+        <LogoUploadForm companyId={typedCompany.id} currentLogoUrl={typedCompany.logo_url} />
         <CompanyInfoForm company={typedCompany} />
         <PreferencesForm company={typedCompany} />
       </div>

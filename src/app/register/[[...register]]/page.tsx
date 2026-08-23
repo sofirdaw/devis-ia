@@ -168,10 +168,7 @@ export default function RegisterPage() {
 
         <div className="mt-6 text-center text-sm text-gray-500">
           Déjà un compte ?{" "}
-          <Link
-            href="/login"
-            className="font-medium text-primary-600 hover:text-primary-500"
-          >
+          <Link href="/login" className="font-medium text-primary-600 hover:text-primary-500">
             Se connecter
           </Link>
         </div>

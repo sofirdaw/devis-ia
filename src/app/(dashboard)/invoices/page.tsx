@@ -32,9 +32,7 @@ export default async function InvoicesPage() {
           .in("invoice_id", invoiceIds)
       : { data: [] };
 
-    const receivableByInvoiceId = new Map(
-      (receivables ?? []).map((r) => [r.invoice_id, r])
-    );
+    const receivableByInvoiceId = new Map((receivables ?? []).map((r) => [r.invoice_id, r]));
 
     invoicesWithReceivable = (invoices ?? []).map((invoice) => ({
       ...invoice,

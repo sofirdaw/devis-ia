@@ -31,7 +31,7 @@ const CompanySchema = z.object({
  */
 export async function createCompanyAction(
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const parsed = CompanySchema.safeParse({
     name: formData.get("name") || "",
@@ -145,7 +145,7 @@ export async function createCompanyAction(
 export async function updateCompanyAction(
   companyId: string,
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const parsed = CompanySchema.safeParse({
     name: formData.get("name") || "",
@@ -196,7 +196,7 @@ export async function updateCompanyAction(
 export async function updateCompanyPreferencesAction(
   companyId: string,
   _prevState: ActionResult,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult> {
   const PreferencesSchema = z.object({
     quote_prefix: z.string().min(1, "Préfixe requis").max(10),
@@ -237,7 +237,7 @@ export async function updateCompanyPreferencesAction(
  */
 export async function uploadCompanyLogoAction(
   companyId: string,
-  formData: FormData,
+  formData: FormData
 ): Promise<ActionResult & { logoUrl?: string }> {
   const file = formData.get("logo") as File | null;
 

@@ -46,7 +46,10 @@ export function InvoiceEditForm({ invoice, clients, products, taxRate }: Invoice
   return (
     <form action={formAction} className="space-y-6">
       {state.error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm" role="alert">
+        <div
+          className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"
+          role="alert"
+        >
           {state.error}
         </div>
       )}
@@ -71,15 +74,26 @@ export function InvoiceEditForm({ invoice, clients, products, taxRate }: Invoice
               />
               {selectedClient && (
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 sm:p-5 text-sm text-gray-600 space-y-1 lg:space-y-2 shadow-sm transition-all duration-200 animate-fadeIn">
-                  <p className="font-semibold text-blue-900 text-xs uppercase tracking-wider mb-1 lg:mb-2">Informations Client</p>
+                  <p className="font-semibold text-blue-900 text-xs uppercase tracking-wider mb-1 lg:mb-2">
+                    Informations Client
+                  </p>
                   {selectedClient.email && (
-                    <p className="flex items-center gap-1.5 lg:gap-2"><span className="font-medium text-gray-700 w-16 lg:w-20">Email:</span> {selectedClient.email}</p>
+                    <p className="flex items-center gap-1.5 lg:gap-2">
+                      <span className="font-medium text-gray-700 w-16 lg:w-20">Email:</span>{" "}
+                      {selectedClient.email}
+                    </p>
                   )}
                   {selectedClient.phone && (
-                    <p className="flex items-center gap-1.5 lg:gap-2"><span className="font-medium text-gray-700 w-16 lg:w-20">Téléphone:</span> {selectedClient.phone}</p>
+                    <p className="flex items-center gap-1.5 lg:gap-2">
+                      <span className="font-medium text-gray-700 w-16 lg:w-20">Téléphone:</span>{" "}
+                      {selectedClient.phone}
+                    </p>
                   )}
                   {selectedClient.address && (
-                    <p className="flex items-center gap-1.5 lg:gap-2"><span className="font-medium text-gray-700 w-16 lg:w-20">Adresse:</span> {selectedClient.address}</p>
+                    <p className="flex items-center gap-1.5 lg:gap-2">
+                      <span className="font-medium text-gray-700 w-16 lg:w-20">Adresse:</span>{" "}
+                      {selectedClient.address}
+                    </p>
                   )}
                 </div>
               )}
@@ -87,11 +101,18 @@ export function InvoiceEditForm({ invoice, clients, products, taxRate }: Invoice
 
             {/* Articles */}
             <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-100 p-4 sm:p-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-3 lg:mb-4">Articles</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-3 lg:mb-4">
+                Articles
+              </label>
               <LineItemsEditor items={items} onChange={setItems} products={products} />
             </div>
 
-            <Textarea name="notes" label="Notes (optionnel)" rows={3} defaultValue={invoice.notes ?? ""} />
+            <Textarea
+              name="notes"
+              label="Notes (optionnel)"
+              rows={3}
+              defaultValue={invoice.notes ?? ""}
+            />
           </div>
 
           {/* Colonne latérale (Sticky) */}
@@ -115,9 +136,16 @@ export function InvoiceEditForm({ invoice, clients, products, taxRate }: Invoice
 
         <div className="flex flex-col sm:flex-row sm:justify-between gap-3 pt-4 lg:pt-6 border-t border-gray-100 mt-6 lg:mt-8">
           <Link href={`/invoices/${invoice.id}`}>
-            <Button type="button" variant="outline" className="w-full sm:w-auto">Annuler</Button>
+            <Button type="button" variant="outline" className="w-full sm:w-auto">
+              Annuler
+            </Button>
           </Link>
-          <Button type="submit" size="lg" isLoading={isPending} className="w-full sm:w-auto px-8 lg:px-10 shadow-lg">
+          <Button
+            type="submit"
+            size="lg"
+            isLoading={isPending}
+            className="w-full sm:w-auto px-8 lg:px-10 shadow-lg"
+          >
             {isPending ? "Enregistrement..." : "Enregistrer les modifications"}
           </Button>
         </div>

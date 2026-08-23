@@ -1,6 +1,6 @@
 /**
  * Composant Sidebar — Navigation latérale de l'application
- * 
+ *
  * Affiche :
  * - Logo de l'app
  * - Menu de navigation principal
@@ -40,43 +40,43 @@ const NAV_ITEMS: {
   icon: typeof LayoutDashboard;
   highlight?: boolean;
 }[] = [
-    {
-      label: "Tableau de bord",
-      href: "/dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      label: "Devis IA",
-      href: "/quotes",
-      icon: Sparkles,
-      /* highlight: true,*/
-    },
-    {
-      label: "Factures",
-      href: "/invoices",
-      icon: Receipt,
-    },
-    {
-      label: "Créances",
-      href: "/receivables",
-      icon: DollarSign,
-    },
-    {
-      label: "Clients",
-      href: "/clients",
-      icon: Users,
-    },
-    {
-      label: "Produits",
-      href: "/products",
-      icon: Package,
-    },
-    {
-      label: "Fournisseurs",
-      href: "/suppliers",
-      icon: Factory,
-    },
-  ];
+  {
+    label: "Tableau de bord",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    label: "Devis IA",
+    href: "/quotes",
+    icon: Sparkles,
+    /* highlight: true,*/
+  },
+  {
+    label: "Factures",
+    href: "/invoices",
+    icon: Receipt,
+  },
+  {
+    label: "Créances",
+    href: "/receivables",
+    icon: DollarSign,
+  },
+  {
+    label: "Clients",
+    href: "/clients",
+    icon: Users,
+  },
+  {
+    label: "Produits",
+    href: "/products",
+    icon: Package,
+  },
+  {
+    label: "Fournisseurs",
+    href: "/suppliers",
+    icon: Factory,
+  },
+];
 
 const BOTTOM_ITEMS = [
   {
@@ -136,7 +136,11 @@ export function Sidebar() {
         {/* Logo + Close button mobile */}
         <div className="px-4 py-4 border-b border-gray-800 flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0" onClick={handleLinkClick}>
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2.5 min-w-0"
+              onClick={handleLinkClick}
+            >
               {company?.logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -154,8 +158,12 @@ export function Sidebar() {
                 />
               )}
               <span className="font-semibold text-white text-sm truncate">
-                {company?.name ? company.name : (
-                  <>Devis<span className="text-primary-400">IA</span></>
+                {company?.name ? (
+                  company.name
+                ) : (
+                  <>
+                    Devis<span className="text-primary-400">IA</span>
+                  </>
                 )}
               </span>
             </Link>

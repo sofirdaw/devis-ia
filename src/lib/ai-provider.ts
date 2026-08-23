@@ -57,45 +57,7 @@ function getApiKeys(envVarName: string): string[] {
 function getVisionTargets(): ProviderTarget[] {
   const targets: ProviderTarget[] = [];
 
-  // 1. Groq Vision (Ultra-rapide, gratuit & excellent pour l'OCR)
-  const groqKeys = getApiKeys("GROQ_API_KEY");
-  groqKeys.forEach((key, idx) => {
-    targets.push({
-      name: `Groq Llama 3.2 11B Vision (Clé ${idx + 1})`,
-      baseURL: "https://api.groq.com/openai/v1",
-      apiKey: key,
-      model: "llama-3.2-11b-vision-preview",
-      isVision: true,
-    });
-    targets.push({
-      name: `Groq Llama 3.2 90B Vision (Clé ${idx + 1})`,
-      baseURL: "https://api.groq.com/openai/v1",
-      apiKey: key,
-      model: "llama-3.2-90b-vision-preview",
-      isVision: true,
-    });
-  });
-
-  // 2. OpenRouter Vision (Gemini 2.0 Flash & GPT-4o-mini)
-  const openRouterKeys = getApiKeys("OPENROUTER_API_KEY");
-  openRouterKeys.forEach((key, idx) => {
-    targets.push({
-      name: `OpenRouter Gemini 2.0 Flash (Clé ${idx + 1})`,
-      baseURL: "https://openrouter.ai/api/v1",
-      apiKey: key,
-      model: "google/gemini-2.0-flash-001",
-      isVision: true,
-    });
-    targets.push({
-      name: `OpenRouter GPT-4o Mini Vision (Clé ${idx + 1})`,
-      baseURL: "https://openrouter.ai/api/v1",
-      apiKey: key,
-      model: "openai/gpt-4o-mini",
-      isVision: true,
-    });
-  });
-
-  // 3. Mistral AI Pixtral & Small (Spécialiste OCR & manuscrit)
+  // 1. Mistral AI Pixtral & Small (Spécialiste OCR & manuscrit - Stable & Actif)
   const mistralKeys = getApiKeys("MISTRAL_API_KEY");
   mistralKeys.forEach((key, idx) => {
     targets.push({
@@ -107,8 +69,29 @@ function getVisionTargets(): ProviderTarget[] {
     });
   });
 
-  // 4. Google Gemini Direct (via GEMINI_API_KEY)
-  const geminiKeys = getApiKeys("GEMINI_API_KEY").concat(getApiKeys("GOOGLE_GENERATIVE_AI_API_KEY"));
+  // 2. OpenRouter Vision (GPT-4o-mini & Gemini)
+  const openRouterKeys = getApiKeys("OPENROUTER_API_KEY");
+  openRouterKeys.forEach((key, idx) => {
+    targets.push({
+      name: `OpenRouter GPT-4o Mini Vision (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "openai/gpt-4o-mini",
+      isVision: true,
+    });
+    targets.push({
+      name: `OpenRouter Gemini 2.0 Flash (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "google/gemini-2.0-flash-exp:free",
+      isVision: true,
+    });
+  });
+
+  // 3. Google Gemini Direct (via GEMINI_API_KEY)
+  const geminiKeys = getApiKeys("GEMINI_API_KEY").concat(
+    getApiKeys("GOOGLE_GENERATIVE_AI_API_KEY")
+  );
   geminiKeys.forEach((key, idx) => {
     targets.push({
       name: `Google Gemini 2.0 Flash (Clé ${idx + 1})`,
@@ -126,7 +109,8 @@ function getVisionTargets(): ProviderTarget[] {
     });
   });
 
-  // 5. OpenAI Vision (gpt-4o-mini)
+  // 4. OpenAI Vision (gpt-4o-mini)
+
   const openAiKeys = getApiKeys("OPENAI_API_KEY");
   openAiKeys.forEach((key, idx) => {
     targets.push({
@@ -190,7 +174,9 @@ function getTextTargets(): ProviderTarget[] {
   });
 
   // 4. Google Gemini Direct
-  const geminiKeys = getApiKeys("GEMINI_API_KEY").concat(getApiKeys("GOOGLE_GENERATIVE_AI_API_KEY"));
+  const geminiKeys = getApiKeys("GEMINI_API_KEY").concat(
+    getApiKeys("GOOGLE_GENERATIVE_AI_API_KEY")
+  );
   geminiKeys.forEach((key, idx) => {
     targets.push({
       name: `Google Gemini 1.5 Flash (Clé ${idx + 1})`,
@@ -226,7 +212,8 @@ async function executeWithWaterfall(
   if (targets.length === 0) {
     return {
       success: false,
-      error: "Aucun fournisseur d'IA configuré. Veuillez définir au moins une clé API (GEMINI_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY ou OPENAI_API_KEY).",
+      error:
+        "Aucun fournisseur d'IA configuré. Veuillez définir au moins une clé API (GEMINI_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY ou OPENAI_API_KEY).",
     };
   }
 
@@ -269,7 +256,10 @@ async function executeWithWaterfall(
       // Nettoyage au cas où l'IA retourne des balises markdown ```json ... ```
       let jsonString = rawContent.trim();
       if (jsonString.startsWith("```")) {
-        jsonString = jsonString.replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, "").trim();
+        jsonString = jsonString
+          .replace(/^```[a-z]*\n?/, "")
+          .replace(/\n?```$/, "")
+          .trim();
       }
 
       const parsedData = JSON.parse(jsonString) as AIExtractionPayload;
@@ -359,7 +349,6 @@ Réponds STRICTEMENT avec ce format JSON valide, sans aucun texte autour :
       image_url: { url: imageBase64 },
     },
   ];
-
 
   return executeWithWaterfall(targets, systemPrompt, userContent);
 }

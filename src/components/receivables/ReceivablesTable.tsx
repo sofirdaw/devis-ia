@@ -67,7 +67,9 @@ export function ReceivablesTable({ initialReceivables }: ReceivablesTableProps) 
         <div className="bg-white rounded-xl border border-gray-200 py-12 lg:py-16 text-center">
           <DollarSign size={32} className="text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 text-sm">
-            {search ? "Aucune créance trouvée pour cette recherche" : "Aucune créance pour le moment"}
+            {search
+              ? "Aucune créance trouvée pour cette recherche"
+              : "Aucune créance pour le moment"}
           </p>
         </div>
       ) : (
@@ -79,12 +81,18 @@ export function ReceivablesTable({ initialReceivables }: ReceivablesTableProps) 
                 <tr className="border-b border-gray-100 bg-gray-50/50">
                   <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">Facture</th>
                   <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">Client</th>
-                  <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">Montant total</th>
+                  <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">
+                    Montant total
+                  </th>
                   <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">Payé</th>
                   <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">Reste</th>
                   <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">Statut</th>
-                  <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">Échéance</th>
-                  <th className="text-right font-medium text-gray-500 px-4 sm:px-5 py-3">Actions</th>
+                  <th className="text-left font-medium text-gray-500 px-4 sm:px-5 py-3">
+                    Échéance
+                  </th>
+                  <th className="text-right font-medium text-gray-500 px-4 sm:px-5 py-3">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

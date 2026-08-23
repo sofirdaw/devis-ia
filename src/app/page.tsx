@@ -18,7 +18,8 @@ export default function HomePage() {
             Devis<span className="text-blue-600">IA</span>
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Créez des devis professionnels en quelques secondes grâce à l&apos;intelligence artificielle
+            Créez des devis professionnels en quelques secondes grâce à l&apos;intelligence
+            artificielle
           </p>
         </div>
 
@@ -51,7 +52,9 @@ export default function HomePage() {
               <FileText size={24} className="text-blue-600" />
             </div>
             <h3 className="font-semibold text-gray-900 mb-2">Devis instantanés</h3>
-            <p className="text-gray-600 text-sm">Générez des devis professionnels en quelques clics</p>
+            <p className="text-gray-600 text-sm">
+              Générez des devis professionnels en quelques clics
+            </p>
           </div>
 
           <div className="bg-white/80 backdrop-blur rounded-xl p-6 shadow-md">

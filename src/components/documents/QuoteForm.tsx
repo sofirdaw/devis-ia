@@ -118,7 +118,10 @@ export function QuoteForm({
   return (
     <form ref={formRef} action={formAction} onSubmit={handleSubmit} className="space-y-6">
       {state.error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm" role="alert">
+        <div
+          className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"
+          role="alert"
+        >
           {state.error}
         </div>
       )}
@@ -144,15 +147,26 @@ export function QuoteForm({
               />
               {selectedClient && (
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 sm:p-5 text-sm text-gray-600 space-y-1 lg:space-y-2 shadow-sm transition-all duration-200 animate-fadeIn">
-                  <p className="font-semibold text-blue-900 text-xs uppercase tracking-wider mb-1 lg:mb-2">Informations Client</p>
+                  <p className="font-semibold text-blue-900 text-xs uppercase tracking-wider mb-1 lg:mb-2">
+                    Informations Client
+                  </p>
                   {selectedClient.email && (
-                    <p className="flex items-center gap-1.5 lg:gap-2"><span className="font-medium text-gray-700 w-16 lg:w-20">Email:</span> {selectedClient.email}</p>
+                    <p className="flex items-center gap-1.5 lg:gap-2">
+                      <span className="font-medium text-gray-700 w-16 lg:w-20">Email:</span>{" "}
+                      {selectedClient.email}
+                    </p>
                   )}
                   {selectedClient.phone && (
-                    <p className="flex items-center gap-1.5 lg:gap-2"><span className="font-medium text-gray-700 w-16 lg:w-20">Téléphone:</span> {selectedClient.phone}</p>
+                    <p className="flex items-center gap-1.5 lg:gap-2">
+                      <span className="font-medium text-gray-700 w-16 lg:w-20">Téléphone:</span>{" "}
+                      {selectedClient.phone}
+                    </p>
                   )}
                   {selectedClient.address && (
-                    <p className="flex items-center gap-1.5 lg:gap-2"><span className="font-medium text-gray-700 w-16 lg:w-20">Adresse:</span> {selectedClient.address}</p>
+                    <p className="flex items-center gap-1.5 lg:gap-2">
+                      <span className="font-medium text-gray-700 w-16 lg:w-20">Adresse:</span>{" "}
+                      {selectedClient.address}
+                    </p>
                   )}
                 </div>
               )}
@@ -197,8 +211,17 @@ export function QuoteForm({
         </div>
 
         <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 lg:pt-6 border-t border-gray-100 mt-6 lg:mt-8">
-          <Button type="submit" size="lg" isLoading={isPending || isSavingOffline} className="w-full sm:w-auto px-8 lg:px-10 shadow-lg">
-            {isSavingOffline ? "Sauvegarde locale..." : isPending ? "Création..." : "Créer le devis"}
+          <Button
+            type="submit"
+            size="lg"
+            isLoading={isPending || isSavingOffline}
+            className="w-full sm:w-auto px-8 lg:px-10 shadow-lg"
+          >
+            {isSavingOffline
+              ? "Sauvegarde locale..."
+              : isPending
+                ? "Création..."
+                : "Créer le devis"}
           </Button>
         </div>
       </div>

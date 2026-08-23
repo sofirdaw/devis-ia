@@ -1,6 +1,6 @@
 /**
  * Composant Input — Champ de saisie réutilisable
- * 
+ *
  * Fonctionnalités :
  * - Label intégré avec indicateur "requis"
  * - Message d'erreur affiché en rouge sous le champ
@@ -13,8 +13,8 @@ import { forwardRef, type InputHTMLAttributes } from "react";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
-  error?: string;        // Message d'erreur (react-hook-form)
-  hint?: string;         // Texte d'aide optionnel sous le champ
+  error?: string; // Message d'erreur (react-hook-form)
+  hint?: string; // Texte d'aide optionnel sous le champ
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
 }
@@ -27,13 +27,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       <div className="w-full">
         {/* Label */}
         {label && (
-          <label
-            htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700 mb-1.5"
-          >
+          <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1.5">
             {label}
             {required && (
-              <span className="text-danger-500 ml-1" aria-hidden="true">*</span>
+              <span className="text-danger-500 ml-1" aria-hidden="true">
+                *
+              </span>
             )}
           </label>
         )}
@@ -67,9 +66,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               className
             )}
             aria-invalid={error ? "true" : "false"}
-            aria-describedby={
-              error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined
-            }
+            aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
             {...props}
           />
 
@@ -82,11 +79,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
         {/* Message d'erreur */}
         {error && (
-          <p
-            id={`${inputId}-error`}
-            className="mt-1.5 text-xs text-danger-600"
-            role="alert"
-          >
+          <p id={`${inputId}-error`} className="mt-1.5 text-xs text-danger-600" role="alert">
             {error}
           </p>
         )}

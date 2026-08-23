@@ -95,11 +95,7 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
         .eq("company_id", company.id)
         .gte("created_at", startOfMonth.toISOString()),
 
-      supabase
-        .from("invoices")
-        .select("total")
-        .eq("company_id", company.id)
-        .eq("status", "paid"),
+      supabase.from("invoices").select("total").eq("company_id", company.id).eq("status", "paid"),
 
       supabase
         .from("invoices")
@@ -109,18 +105,14 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
 
       supabase
         .from("quotes")
-        .select(
-          "id, quote_number, total, status, created_at, client:clients(name)"
-        )
+        .select("id, quote_number, total, status, created_at, client:clients(name)")
         .eq("company_id", company.id)
         .order("created_at", { ascending: false })
         .limit(5),
 
       supabase
         .from("invoices")
-        .select(
-          "id, invoice_number, total, status, created_at, client:clients(name)"
-        )
+        .select("id, invoice_number, total, status, created_at, client:clients(name)")
         .eq("company_id", company.id)
         .order("created_at", { ascending: false })
         .limit(5),
@@ -132,42 +124,24 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
         .gte("created_at", `${new Date().getFullYear()}-01-01`),
     ]);
 
-    const quotesCount =
-      quotesRes.status === "fulfilled" ? quotesRes.value.count ?? 0 : 0;
-    const invoicesCount =
-      invoicesRes.status === "fulfilled" ? invoicesRes.value.count ?? 0 : 0;
+    const quotesCount = quotesRes.status === "fulfilled" ? (quotesRes.value.count ?? 0) : 0;
+    const invoicesCount = invoicesRes.status === "fulfilled" ? (invoicesRes.value.count ?? 0) : 0;
 
     const paidInvoices =
-      paidInvoicesRes.status === "fulfilled"
-        ? paidInvoicesRes.value.data ?? []
-        : [];
+      paidInvoicesRes.status === "fulfilled" ? (paidInvoicesRes.value.data ?? []) : [];
     const unpaidInvoices =
-      unpaidInvoicesRes.status === "fulfilled"
-        ? unpaidInvoicesRes.value.data ?? []
-        : [];
+      unpaidInvoicesRes.status === "fulfilled" ? (unpaidInvoicesRes.value.data ?? []) : [];
 
     const recentQuotesRaw =
-      recentQuotesRes.status === "fulfilled"
-        ? recentQuotesRes.value.data ?? []
-        : [];
+      recentQuotesRes.status === "fulfilled" ? (recentQuotesRes.value.data ?? []) : [];
     const recentInvoicesRaw =
-      recentInvoicesRes.status === "fulfilled"
-        ? recentInvoicesRes.value.data ?? []
-        : [];
+      recentInvoicesRes.status === "fulfilled" ? (recentInvoicesRes.value.data ?? []) : [];
 
     const yearInvoices =
-      yearInvoicesRes.status === "fulfilled"
-        ? yearInvoicesRes.value.data ?? []
-        : [];
+      yearInvoicesRes.status === "fulfilled" ? (yearInvoicesRes.value.data ?? []) : [];
 
-    const totalRevenue = paidInvoices.reduce(
-      (sum, inv) => sum + (inv.total || 0),
-      0
-    );
-    const unpaidAmount = unpaidInvoices.reduce(
-      (sum, inv) => sum + (inv.total || 0),
-      0
-    );
+    const totalRevenue = paidInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+    const unpaidAmount = unpaidInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
 
     const monthlyTotals = new Array(12).fill(0);
     yearInvoices.forEach((inv) => {
@@ -208,16 +182,14 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
         created_at: q.created_at || new Date().toISOString(),
         client_name: q.client?.name ?? "—",
       })),
-      recentInvoices: (recentInvoicesRaw as unknown as RawDoc[]).map(
-        (inv) => ({
-          id: inv.id,
-          invoice_number: inv.invoice_number || "FAC-???",
-          total: inv.total || 0,
-          status: inv.status || "draft",
-          created_at: inv.created_at || new Date().toISOString(),
-          client_name: inv.client?.name ?? "—",
-        })
-      ),
+      recentInvoices: (recentInvoicesRaw as unknown as RawDoc[]).map((inv) => ({
+        id: inv.id,
+        invoice_number: inv.invoice_number || "FAC-???",
+        total: inv.total || 0,
+        status: inv.status || "draft",
+        created_at: inv.created_at || new Date().toISOString(),
+        client_name: inv.client?.name ?? "—",
+      })),
       monthlyRevenue,
     };
   } catch (error: unknown) {

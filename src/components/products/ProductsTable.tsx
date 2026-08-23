@@ -19,10 +19,7 @@ interface ProductsTableProps {
   suppliers: Supplier[];
 }
 
-export function ProductsTable({
-  initialProducts,
-  suppliers,
-}: ProductsTableProps) {
+export function ProductsTable({ initialProducts, suppliers }: ProductsTableProps) {
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
@@ -55,11 +52,7 @@ export function ProductsTable({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button
-          leftIcon={<Plus size={16} />}
-          onClick={openCreateForm}
-          className="w-full sm:w-auto"
-        >
+        <Button leftIcon={<Plus size={16} />} onClick={openCreateForm} className="w-full sm:w-auto">
           Ajouter un produit
         </Button>
       </div>
@@ -71,12 +64,7 @@ export function ProductsTable({
             {search ? "Aucun produit trouvé" : "Aucun produit pour le moment"}
           </p>
           {!search && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4"
-              onClick={openCreateForm}
-            >
+            <Button variant="outline" size="sm" className="mt-4" onClick={openCreateForm}>
               Ajouter votre premier produit
             </Button>
           )}
@@ -90,9 +78,7 @@ export function ProductsTable({
             >
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
-                  <h3 className="font-medium text-gray-900 truncate">
-                    {product.name}
-                  </h3>
+                  <h3 className="font-medium text-gray-900 truncate">{product.name}</h3>
                   {product.description && (
                     <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
                       {product.description}

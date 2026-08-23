@@ -26,10 +26,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <Header
-        title="Tableau de bord"
-        description="Vue d'ensemble de votre activité"
-      />
+      <Header title="Tableau de bord" description="Vue d'ensemble de votre activité" />
       <div className="page-container space-y-4 sm:space-y-6">
         {/* ── Cartes de statistiques ───────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

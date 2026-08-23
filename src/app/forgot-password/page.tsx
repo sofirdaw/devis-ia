@@ -43,7 +43,8 @@ export default function ForgotPasswordPage() {
         {success ? (
           <div className="text-center space-y-4">
             <div className="p-4 rounded-xl bg-green-50 text-green-700 border border-green-200 text-sm font-medium">
-              Un email de réinitialisation a été envoyé si un compte correspond à cette adresse. Vérifiez votre boîte de réception.
+              Un email de réinitialisation a été envoyé si un compte correspond à cette adresse.
+              Vérifiez votre boîte de réception.
             </div>
             <Link
               href="/login"
@@ -82,10 +83,7 @@ export default function ForgotPasswordPage() {
             </button>
 
             <div className="mt-4 text-center">
-              <Link
-                href="/login"
-                className="text-xs font-medium text-gray-500 hover:text-gray-700"
-              >
+              <Link href="/login" className="text-xs font-medium text-gray-500 hover:text-gray-700">
                 ← Retour à la connexion
               </Link>
             </div>

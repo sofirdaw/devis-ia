@@ -18,8 +18,10 @@ export function TotalsSummary({ items, taxRate, discount, onDiscountChange }: To
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
-      <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2">Récapitulatif</h3>
-      
+      <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2">
+        Récapitulatif
+      </h3>
+
       {/* Sous-total */}
       <div className="flex justify-between text-sm">
         <span className="text-gray-500">Sous-total HT</span>
@@ -54,7 +56,9 @@ export function TotalsSummary({ items, taxRate, discount, onDiscountChange }: To
       <div className="border-t border-gray-150 pt-4 flex flex-col gap-1">
         <div className="flex justify-between items-baseline">
           <span className="text-sm font-semibold text-gray-700">Montant Total TTC</span>
-          <span className="text-2xl font-bold text-blue-600 tracking-tight">{formatCurrency(total)}</span>
+          <span className="text-2xl font-bold text-blue-600 tracking-tight">
+            {formatCurrency(total)}
+          </span>
         </div>
         {discount > 0 && (
           <div className="text-right text-xs text-green-600 font-medium animate-pulse">

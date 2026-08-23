@@ -41,8 +41,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const icons = {
     success: <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />,
-    error:   <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />,
-    info:    <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0" />,
+    error: <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />,
+    info: <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0" />,
   };
 
   return (
@@ -56,8 +56,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             className={cn(
               "flex items-start gap-3 rounded-xl border bg-white p-4 shadow-lg animate-in slide-in-from-right-5",
               t.type === "success" && "border-green-100",
-              t.type === "error"   && "border-red-100",
-              t.type === "info"    && "border-blue-100"
+              t.type === "error" && "border-red-100",
+              t.type === "info" && "border-blue-100"
             )}
           >
             {icons[t.type]}
