@@ -60,8 +60,12 @@ export function QuoteForm({
   const [state, formAction, isPending] = useActionState(createQuoteAction, initialState);
   const formRef = useRef<HTMLFormElement>(null);
 
+  // Date d'aujourd'hui au format YYYY-MM-DD (utilisée comme valeur par défaut)
+  const todayISO = new Date().toISOString().split("T")[0];
+
   const clientOptions = clients.map((c) => ({ value: c.id, label: c.name }));
   const selectedClient = clients.find((c) => c.id === selectedClientId);
+
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     if (typeof window !== "undefined" && !navigator.onLine) {
@@ -197,7 +201,8 @@ export function QuoteForm({
                 name="valid_until"
                 type="date"
                 label="Valide jusqu'au"
-                defaultValue={initialDate}
+                min={todayISO}
+                defaultValue={initialDate || todayISO}
               />
             </div>
 

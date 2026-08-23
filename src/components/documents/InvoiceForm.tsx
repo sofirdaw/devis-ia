@@ -228,7 +228,7 @@ export function InvoiceForm({
                 type="date"
                 label="Date d'échéance"
                 min={todayISO}
-                defaultValue={initialDate}
+                defaultValue={initialDate || todayISO}
                 onChange={handleDueDateChange}
                 error={dueDateError || undefined}
                 hint="Doit être égale ou postérieure à la date d'aujourd'hui"

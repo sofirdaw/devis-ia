@@ -13,6 +13,8 @@ import { getCurrentCompanyForAction } from "@/lib/current-company";
 import type { ActionResult } from "./auth";
 import type { SupplierInsert } from "@/types";
 
+const OFFLINE_UUID = "00000000-0000-0000-0000-000000000000";
+
 export async function createSupplierAction(
   _prevState: ActionResult,
   formData: FormData
@@ -32,6 +34,10 @@ export async function createSupplierAction(
 
   if (!company) {
     return { error: "Entreprise introuvable" };
+  }
+
+  if (company.id === OFFLINE_UUID) {
+    return { error: "Impossible de créer un fournisseur hors-ligne. Reconnectez-vous pour synchroniser." };
   }
 
   const supplierData: SupplierInsert = {
@@ -73,6 +79,10 @@ export async function createQuickSupplierAction(
   const company = await getCurrentCompanyForAction();
   if (!company) {
     return { error: "Entreprise introuvable" };
+  }
+
+  if (company.id === OFFLINE_UUID) {
+    return { error: "Impossible de créer un fournisseur hors-ligne. Reconnectez-vous pour synchroniser." };
   }
 
   const supabase = await createClient();

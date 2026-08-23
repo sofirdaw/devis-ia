@@ -26,7 +26,10 @@ const QuoteItemSchema = z.object({
 });
 
 const QuoteSchema = z.object({
-  client_id: z.string().min(1, "Veuillez sélectionner un client"),
+  client_id: z
+    .string({ message: "Veuillez sélectionner un client" })
+    .min(1, "Veuillez sélectionner un client"),
+
   items: z.array(QuoteItemSchema).min(1, "Ajoutez au moins une ligne"),
   discount: z.coerce.number().min(0).default(0),
   notes: z.string().optional(),
@@ -51,13 +54,18 @@ export async function createQuoteAction(
     return { error: "Format de lignes invalide" };
   }
 
+  const rawClientId = formData.get("client_id");
+  const client_id =
+    typeof rawClientId === "string" && rawClientId.trim() ? rawClientId.trim() : undefined;
+
   const parsed = QuoteSchema.safeParse({
-    client_id: formData.get("client_id"),
+    client_id,
     items,
     discount: formData.get("discount") || 0,
     notes: formData.get("notes"),
     valid_until: formData.get("valid_until"),
   });
+
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };

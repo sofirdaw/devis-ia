@@ -97,7 +97,7 @@ export async function getCurrentCompanyForAction(): Promise<Company | null> {
   }
 
   return {
-    id: "offline_company_id",
+    id: "00000000-0000-0000-0000-000000000000",
     user_id: user.id,
     name: "Mon Entreprise (Local)",
     quote_prefix: "DEV",
@@ -107,3 +107,4 @@ export async function getCurrentCompanyForAction(): Promise<Company | null> {
     created_at: new Date().toISOString(),
   } as unknown as Company;
 }
+

@@ -1,4 +1,4 @@
-const CACHE_NAME = "devis-ia-v8";
+const CACHE_NAME = "devis-ia-v9";
 
 const STATIC_ASSETS = [
   "/",
@@ -25,14 +25,24 @@ const STATIC_ASSETS = [
   "/favicon.ico",
 ];
 
-// Inscription et préchargement du cache
+// Inscription et préchargement du cache (résilient : chaque ressource est mise en cache indépendamment)
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn("Mise en cache statique partielle:", err);
-      });
-    })
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      await Promise.allSettled(
+        STATIC_ASSETS.map(async (url) => {
+          try {
+            const res = await fetch(url);
+            if (res && res.status === 200) {
+              await cache.put(url, res);
+            }
+          } catch {
+            // Ignorer silencieusement pour continuer la mise en cache des autres routes
+          }
+        })
+      );
+    })()
   );
   self.skipWaiting();
 });
@@ -70,20 +80,16 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method === "POST") {
     event.respondWith(
       fetch(event.request).catch(() => {
-        return new Response(
-          JSON.stringify({ success: true, offline: true }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
+        return new Response(JSON.stringify({ success: true, offline: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       })
     );
     return;
   }
 
-
-  // 1. Assets Statiques & Chunks JS/CSS/Fonts -> CACHE-FIRST
+  // 1. Assets Statiques & Chunks JS/CSS/Fonts -> CACHE-FIRST avec revalidation
   const isStaticAsset =
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
@@ -124,7 +130,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 2. Next.js RSC Data & Prefetches (requêtes ?_rsc=... ou header rsc)
+  // 2. Next.js RSC Data & Prefetches (requêtes ?_rsc=... ou header RSC)
   const isRSCRequest =
     url.searchParams.has("_rsc") ||
     event.request.headers.get("RSC") === "1" ||
@@ -132,25 +138,27 @@ self.addEventListener("fetch", (event) => {
 
   if (isRSCRequest) {
     event.respondWith(
-      fetch(event.request)
-        .then((networkResponse) => {
+      (async () => {
+        try {
+          const networkResponse = await fetch(event.request);
           if (networkResponse && networkResponse.status === 200) {
             const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(event.request, responseToCache);
           }
           return networkResponse;
-        })
-        .catch(async () => {
+        } catch {
           const cached = await caches.match(event.request);
           if (cached) return cached;
-          // Si hors-ligne et RSC manquant, renvoyer une réponse vide valide
-          return new Response("", {
-            status: 200,
-            headers: { "Content-Type": "text/x-component" },
-          });
-        })
+
+          // Si le RSC spécifique n'est pas en cache, chercher la route sans params
+          const cachedBase = await caches.match(url.pathname);
+          if (cachedBase) return cachedBase;
+
+          // Laisser échouer proprement pour que Next.js bascule sur la navigation de page
+          return new Response(null, { status: 503, statusText: "Offline" });
+        }
+      })()
     );
     return;
   }
@@ -165,6 +173,7 @@ self.addEventListener("fetch", (event) => {
             const responseToCache = networkResponse.clone();
             const cache = await caches.open(CACHE_NAME);
             await cache.put(event.request, responseToCache);
+            await cache.put(url.pathname, responseToCache.clone());
           }
 
           // Si la réponse réseau est une redirection, créer une réponse 200 propre
@@ -181,13 +190,16 @@ self.addEventListener("fetch", (event) => {
           return networkResponse;
         } catch {
           // En mode hors-ligne : servir depuis le cache
-          const cached = await caches.match(event.request);
+          const cached = (await caches.match(event.request)) || (await caches.match(url.pathname));
           if (cached) return cached;
 
           const fallback =
-            (await caches.match(url.pathname)) ||
             (await caches.match("/dashboard")) ||
             (await caches.match("/quotes")) ||
+            (await caches.match("/invoices")) ||
+            (await caches.match("/products")) ||
+            (await caches.match("/clients")) ||
+            (await caches.match("/settings")) ||
             (await caches.match("/login")) ||
             (await caches.match("/"));
 
@@ -207,6 +219,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 });
+
 
 
 

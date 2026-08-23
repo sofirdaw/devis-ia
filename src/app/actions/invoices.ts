@@ -23,7 +23,10 @@ const InvoiceItemSchema = z.object({
 });
 
 const InvoiceSchema = z.object({
-  client_id: z.string().min(1, "Veuillez sélectionner un client"),
+  client_id: z
+    .string({ message: "Veuillez sélectionner un client" })
+    .min(1, "Veuillez sélectionner un client"),
+
   items: z.array(InvoiceItemSchema).min(1, "Ajoutez au moins une ligne"),
   discount: z.coerce.number().min(0).default(0),
   notes: z.string().optional(),
@@ -34,7 +37,6 @@ async function getCurrentCompany() {
   return getCurrentCompanyForAction();
 }
 
-// ── CREATE ────────────────────────────────────────────────────────────────────────────────────────
 // ── CREATE ───────────────────────────────────────────────────────────────────
 
 export async function createInvoiceAction(
@@ -49,13 +51,18 @@ export async function createInvoiceAction(
     return { error: "Format de lignes invalide" };
   }
 
+  const rawClientId = formData.get("client_id");
+  const client_id =
+    typeof rawClientId === "string" && rawClientId.trim() ? rawClientId.trim() : undefined;
+
   const parsed = InvoiceSchema.safeParse({
-    client_id: formData.get("client_id"),
+    client_id,
     items,
     discount: formData.get("discount") || 0,
     notes: formData.get("notes"),
     due_date: formData.get("due_date"),
   });
+
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };

@@ -52,32 +52,29 @@ export function PreferencesForm({ company }: PreferencesFormProps) {
 
   const showSuccess = Boolean((state.success || localSuccess) && !dismissed);
 
-  // Synchroniser vers useAuthStore (localStorage)
+  // Synchroniser vers useAuthStore (localStorage) — fonctionne même si currentCompany est null
   const syncToLocalStore = (newQPrefix: string, newIPrefix: string, newTax: number) => {
-    if (currentCompany) {
-      setCompany({
-        ...currentCompany,
-        quote_prefix: newQPrefix.toUpperCase(),
-        invoice_prefix: newIPrefix.toUpperCase(),
-        tax_rate: newTax,
-      });
-    }
+    setCompany({
+      ...(currentCompany ?? company),
+      quote_prefix: newQPrefix.toUpperCase(),
+      invoice_prefix: newIPrefix.toUpperCase(),
+      tax_rate: newTax,
+    });
   };
 
   useEffect(() => {
     if (state.success) {
-      if (currentCompany) {
-        setCompany({
-          ...currentCompany,
-          quote_prefix: quotePrefix.toUpperCase(),
-          invoice_prefix: invoicePrefix.toUpperCase(),
-          tax_rate: Number(taxRate) || 0,
-        });
-      }
+      setCompany({
+        ...(currentCompany ?? company),
+        quote_prefix: quotePrefix.toUpperCase(),
+        invoice_prefix: invoicePrefix.toUpperCase(),
+        tax_rate: Number(taxRate) || 0,
+      });
       const timer = setTimeout(() => setDismissed(true), 3000);
       return () => clearTimeout(timer);
     }
-  }, [state.success, currentCompany, quotePrefix, invoicePrefix, taxRate, setCompany]);
+  }, [state.success, currentCompany, company, quotePrefix, invoicePrefix, taxRate, setCompany]);
+
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     setDismissed(false);

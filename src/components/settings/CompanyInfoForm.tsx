@@ -35,44 +35,42 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
   const [localSuccess, setLocalSuccess] = useState(false);
   const { setCompany, company: currentCompany } = useAuthStore();
 
+  // Base de données : store Zustand en priorité, props serveur en fallback
+  const base = currentCompany ?? company;
+
   // État local pour les valeurs du formulaire
   const [formData, setFormData] = useState({
-    name: currentCompany?.name || company.name || "",
-    phone: currentCompany?.phone ?? company.phone ?? "",
-    email: currentCompany?.email ?? company.email ?? "",
-    address: currentCompany?.address ?? company.address ?? "",
-    rccm: currentCompany?.rccm ?? company.rccm ?? "",
-    ifu: currentCompany?.ifu ?? company.ifu ?? "",
-    cme: currentCompany?.cme ?? company.cme ?? "",
-    default_quote_notes: currentCompany?.default_quote_notes ?? company.default_quote_notes ?? "",
-    default_invoice_notes:
-      currentCompany?.default_invoice_notes ?? company.default_invoice_notes ?? "",
+    name: base.name || "",
+    phone: base.phone ?? "",
+    email: base.email ?? "",
+    address: base.address ?? "",
+    rccm: (base as typeof company).rccm ?? "",
+    ifu: (base as typeof company).ifu ?? "",
+    cme: (base as typeof company).cme ?? "",
+    default_quote_notes: (base as typeof company).default_quote_notes ?? "",
+    default_invoice_notes: (base as typeof company).default_invoice_notes ?? "",
   });
 
   const showSuccess = Boolean((state.success || localSuccess) && !dismissed);
 
-  // Synchroniser vers le store Zustand
+  // Synchroniser vers le store Zustand (fonctionne même si currentCompany est null)
   const syncToStore = (data: typeof formData) => {
-    if (currentCompany) {
-      setCompany({
-        ...currentCompany,
-        ...data,
-      });
-    }
+    setCompany({
+      ...(currentCompany ?? company),
+      ...data,
+    });
   };
 
   useEffect(() => {
     if (state.success) {
-      if (currentCompany) {
-        setCompany({
-          ...currentCompany,
-          ...formData,
-        });
-      }
+      setCompany({
+        ...(currentCompany ?? company),
+        ...formData,
+      });
       const timer = setTimeout(() => setDismissed(true), 3000);
       return () => clearTimeout(timer);
     }
-  }, [state.success, currentCompany, formData, setCompany]);
+  }, [state.success, currentCompany, company, formData, setCompany]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDismissed(false);
@@ -97,6 +95,7 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
       }, 3000);
     }
   };
+
 
   return (
     <Card>

@@ -20,6 +20,8 @@ const ProductSchema = z.object({
   price: z.coerce.number().min(0, "Le prix doit être positif"),
 });
 
+const OFFLINE_UUID = "00000000-0000-0000-0000-000000000000";
+
 async function getCurrentCompanyId(): Promise<string | null> {
   const company = await getCurrentCompanyForAction();
   return company?.id ?? null;
@@ -48,6 +50,10 @@ export async function createProductAction(
 
   const companyId = await getCurrentCompanyId();
   if (!companyId) return { error: "Entreprise introuvable" };
+
+  if (companyId === OFFLINE_UUID) {
+    return { error: "Impossible de créer un produit hors-ligne. Reconnectez-vous pour synchroniser." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.from("products").insert({

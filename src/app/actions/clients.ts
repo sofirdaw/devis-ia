@@ -25,6 +25,8 @@ const ClientSchema = z.object({
  * Récupère l'id de l'entreprise de l'utilisateur Supabase connecté.
  * Utilisé au début de chaque action pour scoper les requêtes.
  */
+const OFFLINE_UUID = "00000000-0000-0000-0000-000000000000";
+
 async function getCurrentCompanyId(): Promise<string | null> {
   const company = await getCurrentCompanyForAction();
   return company?.id ?? null;
@@ -50,6 +52,11 @@ export async function createClientAction(
   const companyId = await getCurrentCompanyId();
   if (!companyId) return { error: "Entreprise introuvable" };
 
+  // En mode hors-ligne, on ne peut pas écrire dans Supabase — retour silencieux
+  if (companyId === OFFLINE_UUID) {
+    return { error: "Impossible de créer un client hors-ligne. Reconnectez-vous pour synchroniser." };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.from("clients").insert({
     company_id: companyId,
@@ -67,6 +74,7 @@ export async function createClientAction(
   revalidatePath("/clients");
   return { success: true };
 }
+
 
 // ── UPDATE ───────────────────────────────────────────────────────────────────
 
