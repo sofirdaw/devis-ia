@@ -61,6 +61,16 @@ export async function createInvoiceAction(
     return { error: parsed.error.issues[0].message };
   }
 
+  // Validation date d'échéance : doit être égale ou postérieure à la date d'émission (aujourd'hui)
+  if (parsed.data.due_date) {
+    const today = new Date().toISOString().split("T")[0];
+    if (parsed.data.due_date < today) {
+      return {
+        error: "La date d'échéance ne peut pas être antérieure à la date d'émission (aujourd'hui).",
+      };
+    }
+  }
+
   const company = await getCurrentCompany();
   if (!company) return { error: "Entreprise introuvable" };
 
@@ -190,6 +200,14 @@ export async function updateInvoiceAction(
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
+  }
+
+  // Validation date d'échéance : doit être égale ou postérieure à la date du jour
+  if (parsed.data.due_date) {
+    const today = new Date().toISOString().split("T")[0];
+    if (parsed.data.due_date < today) {
+      return { error: "La date d'échéance ne peut pas être antérieure à la date d'aujourd'hui." };
+    }
   }
 
   const company = await getCurrentCompany();

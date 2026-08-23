@@ -14,6 +14,9 @@ import { createClient } from "@/lib/supabase/server";
 import { DocumentPDF, type PDFDocumentData } from "@/components/pdf/DocumentPDF";
 import type { Quote } from "@/types";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -44,8 +47,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   let logoUrl = company.logo_url;
   if (logoUrl && logoUrl.startsWith("https://")) {
     // Si c'est déjà une URL complète, on la garde
-    // Sinon, on génère une URL publique depuis Supabase
-  } else if (logoUrl) {
+  } else if (logoUrl && !logoUrl.startsWith("data:")) {
     const {
       data: { publicUrl },
     } = await supabase.storage.from("logos").getPublicUrl(logoUrl);
@@ -80,6 +82,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `inline; filename="${typedQuote.quote_number}.pdf"`,
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
     },
   });
 }

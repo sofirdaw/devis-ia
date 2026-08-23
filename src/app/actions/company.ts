@@ -185,7 +185,6 @@ export async function updateCompanyAction(
     return { error: `Erreur lors de la mise à jour: ${error.message}` };
   }
 
-  revalidatePath("/settings");
   return { success: true };
 }
 
@@ -227,7 +226,6 @@ export async function updateCompanyPreferencesAction(
 
   if (error) return { error: "Erreur lors de la mise à jour des préférences" };
 
-  revalidatePath("/settings");
   return { success: true };
 }
 

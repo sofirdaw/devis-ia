@@ -63,6 +63,17 @@ export async function createQuoteAction(
     return { error: parsed.error.issues[0].message };
   }
 
+  // Validation date de validité : doit être égale ou postérieure à la date d'émission (aujourd'hui)
+  if (parsed.data.valid_until) {
+    const today = new Date().toISOString().split("T")[0];
+    if (parsed.data.valid_until < today) {
+      return {
+        error:
+          "La date de validité ne peut pas être antérieure à la date d'émission (aujourd'hui).",
+      };
+    }
+  }
+
   const company = await getCurrentCompany();
   if (!company) return { error: "Entreprise introuvable" };
 
@@ -159,6 +170,14 @@ export async function updateQuoteAction(
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
+  }
+
+  // Validation date de validité : doit être égale ou postérieure à la date du jour
+  if (parsed.data.valid_until) {
+    const today = new Date().toISOString().split("T")[0];
+    if (parsed.data.valid_until < today) {
+      return { error: "La date de validité ne peut pas être antérieure à la date d'aujourd'hui." };
+    }
   }
 
   const company = await getCurrentCompany();

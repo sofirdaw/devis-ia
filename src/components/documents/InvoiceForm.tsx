@@ -51,13 +51,38 @@ export function InvoiceForm({
   const [discount, setDiscount] = useState(0);
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(initialClientId);
   const [isSavingOffline, setIsSavingOffline] = useState(false);
+  const [dueDateError, setDueDateError] = useState<string | null>(null);
   const [state, formAction, isPending] = useActionState(createInvoiceAction, initialState);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Date d'aujourd'hui au format YYYY-MM-DD (valeur minimale pour l'échéance)
+  const todayISO = new Date().toISOString().split("T")[0];
 
   const clientOptions = clients.map((c) => ({ value: c.id, label: c.name }));
   const selectedClient = clients.find((c) => c.id === selectedClientId);
 
+  // Validation de la date d'échéance en temps réel
+  const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.value;
+    if (selected && selected < todayISO) {
+      setDueDateError(
+        "⚠️ La date d'échéance ne peut pas être antérieure à la date d'émission (aujourd'hui)."
+      );
+    } else {
+      setDueDateError(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    const dueDateInput = formRef.current?.querySelector('[name="due_date"]') as HTMLInputElement;
+    if (dueDateInput?.value && dueDateInput.value < todayISO) {
+      e.preventDefault();
+      setDueDateError(
+        "⚠️ La date d'échéance ne peut pas être antérieure à la date d'émission (aujourd'hui)."
+      );
+      return;
+    }
+
     if (typeof window !== "undefined" && !navigator.onLine) {
       e.preventDefault();
       setIsSavingOffline(true);
@@ -73,7 +98,6 @@ export function InvoiceForm({
       const total = subtotal - discount + tax;
 
       const notesInput = formRef.current?.querySelector('[name="notes"]') as HTMLTextAreaElement;
-      const dueDateInput = formRef.current?.querySelector('[name="due_date"]') as HTMLInputElement;
 
       const offlineInvoice = {
         id: localId,
@@ -203,7 +227,11 @@ export function InvoiceForm({
                 name="due_date"
                 type="date"
                 label="Date d'échéance"
+                min={todayISO}
                 defaultValue={initialDate}
+                onChange={handleDueDateChange}
+                error={dueDateError || undefined}
+                hint="Doit être égale ou postérieure à la date d'aujourd'hui"
               />
             </div>
 
@@ -220,6 +248,7 @@ export function InvoiceForm({
           <Button
             type="submit"
             size="lg"
+            disabled={Boolean(dueDateError)}
             isLoading={isPending || isSavingOffline}
             className="w-full sm:w-auto px-8 lg:px-10 shadow-lg"
           >

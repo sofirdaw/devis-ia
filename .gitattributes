@@ -1,0 +1,11 @@
+# Forcer LF pour tous les fichiers texte (compatible Linux/Mac/Windows)
+* text=auto eol=lf
+
+# Binaires : pas de conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.webp binary
+*.wasm binary
+*.pdf binary

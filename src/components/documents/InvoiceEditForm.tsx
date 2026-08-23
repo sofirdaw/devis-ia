@@ -4,7 +4,8 @@
 
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState, useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +27,7 @@ interface InvoiceEditFormProps {
 const initialState: ActionResult = {};
 
 export function InvoiceEditForm({ invoice, clients, products, taxRate }: InvoiceEditFormProps) {
+  const router = useRouter();
   const [items, setItems] = useState<LineItem[]>(
     (invoice.invoice_items ?? []).map((item) => ({
       product_id: item.product_id,
@@ -39,6 +41,14 @@ export function InvoiceEditForm({ invoice, clients, products, taxRate }: Invoice
 
   const action = updateInvoiceAction.bind(null, invoice.id);
   const [state, formAction, isPending] = useActionState(action, initialState);
+
+  // ✅ Dès que la mise à jour est réussie, naviguer vers la facture pour que le PDF soit à jour
+  useEffect(() => {
+    if (state.success) {
+      router.push(`/invoices/${invoice.id}`);
+      router.refresh();
+    }
+  }, [state.success, invoice.id, router]);
 
   const clientOptions = clients.map((c) => ({ value: c.id, label: c.name }));
   const selectedClient = clients.find((c) => c.id === selectedClientId);

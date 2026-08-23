@@ -5,7 +5,8 @@
 
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState, useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +28,7 @@ interface QuoteEditFormProps {
 const initialState: ActionResult = {};
 
 export function QuoteEditForm({ quote, clients, products, taxRate }: QuoteEditFormProps) {
+  const router = useRouter();
   const [items, setItems] = useState<LineItem[]>(
     (quote.quote_items ?? []).map((item) => ({
       product_id: item.product_id,
@@ -40,6 +42,14 @@ export function QuoteEditForm({ quote, clients, products, taxRate }: QuoteEditFo
 
   const action = updateQuoteAction.bind(null, quote.id);
   const [state, formAction, isPending] = useActionState(action, initialState);
+
+  // Dès que la mise à jour est réussie, naviguer vers le devis pour que le PDF soit immédiatement à jour
+  useEffect(() => {
+    if (state.success) {
+      router.push(`/quotes/${quote.id}`);
+      router.refresh();
+    }
+  }, [state.success, quote.id, router]);
 
   const clientOptions = clients.map((c) => ({ value: c.id, label: c.name }));
   const selectedClient = clients.find((c) => c.id === selectedClientId);

@@ -16,15 +16,13 @@ interface DownloadPdfButtonProps {
 }
 
 export function DownloadPdfButton({ type, documentId }: DownloadPdfButtonProps) {
-  const pdfUrl = `/api/pdf/${type}/${documentId}`;
+  const handleOpenPdf = () => {
+    const pdfUrl = `/api/pdf/${type}/${documentId}?t=${Date.now()}`;
+    window.open(pdfUrl, "_blank");
+  };
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      leftIcon={<Download size={14} />}
-      onClick={() => window.open(pdfUrl, "_blank")}
-    >
+    <Button variant="outline" size="sm" leftIcon={<Download size={14} />} onClick={handleOpenPdf}>
       PDF
     </Button>
   );

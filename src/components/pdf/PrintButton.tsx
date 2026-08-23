@@ -29,8 +29,9 @@ export function PrintButton({
     if (typeof window === "undefined") return;
 
     if (pdfUrl) {
-      // Ouvre le PDF dans un nouvel onglet — le navigateur propose l'impression native du PDF
-      window.open(pdfUrl, "_blank");
+      // Ouvre le PDF avec cache-buster pour garantir un rendu à jour
+      const separator = pdfUrl.includes("?") ? "&" : "?";
+      window.open(`${pdfUrl}${separator}t=${Date.now()}`, "_blank");
     } else {
       // Fallback : impression de la page courante
       window.print();
