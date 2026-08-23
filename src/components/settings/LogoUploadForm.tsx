@@ -77,12 +77,12 @@ async function compressImageFile(
 }
 
 export function LogoUploadForm({ companyId, currentLogoUrl }: LogoUploadFormProps) {
-  const [preview, setPreview] = useState<string | null>(currentLogoUrl);
+  const { company, setCompany } = useAuthStore();
+  const [preview, setPreview] = useState<string | null>(company?.logo_url || currentLogoUrl);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { company, setCompany } = useAuthStore();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawFile = e.target.files?.[0];

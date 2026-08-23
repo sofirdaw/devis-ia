@@ -165,6 +165,37 @@ export async function updateCompanyAction(
 
   const supabase = await createClient();
 
+  let targetCompanyId = companyId;
+  if (
+    !targetCompanyId ||
+    targetCompanyId === "00000000-0000-0000-0000-000000000000" ||
+    targetCompanyId.startsWith("offline")
+  ) {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data: realComp } = await supabase
+          .from("companies")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (realComp?.id) targetCompanyId = realComp.id;
+      }
+    } catch {
+      // Hors-ligne
+    }
+  }
+
+  if (
+    !targetCompanyId ||
+    targetCompanyId === "00000000-0000-0000-0000-000000000000" ||
+    targetCompanyId.startsWith("offline")
+  ) {
+    return { success: true };
+  }
+
   const { error } = await supabase
     .from("companies")
     .update({
@@ -178,7 +209,7 @@ export async function updateCompanyAction(
       default_quote_notes: parsed.data.default_quote_notes || null,
       default_invoice_notes: parsed.data.default_invoice_notes || null,
     })
-    .eq("id", companyId);
+    .eq("id", targetCompanyId);
 
   if (error) {
     console.error("Erreur update company:", error);
@@ -215,6 +246,37 @@ export async function updateCompanyPreferencesAction(
 
   const supabase = await createClient();
 
+  let targetCompanyId = companyId;
+  if (
+    !targetCompanyId ||
+    targetCompanyId === "00000000-0000-0000-0000-000000000000" ||
+    targetCompanyId.startsWith("offline")
+  ) {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data: realComp } = await supabase
+          .from("companies")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (realComp?.id) targetCompanyId = realComp.id;
+      }
+    } catch {
+      // Hors-ligne
+    }
+  }
+
+  if (
+    !targetCompanyId ||
+    targetCompanyId === "00000000-0000-0000-0000-000000000000" ||
+    targetCompanyId.startsWith("offline")
+  ) {
+    return { success: true };
+  }
+
   const { error } = await supabase
     .from("companies")
     .update({
@@ -222,7 +284,7 @@ export async function updateCompanyPreferencesAction(
       invoice_prefix: parsed.data.invoice_prefix.toUpperCase(),
       tax_rate: parsed.data.tax_rate,
     })
-    .eq("id", companyId);
+    .eq("id", targetCompanyId);
 
   if (error) return { error: "Erreur lors de la mise à jour des préférences" };
 

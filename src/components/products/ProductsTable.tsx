@@ -116,6 +116,7 @@ export function ProductsTable({ initialProducts, suppliers }: ProductsTableProps
       )}
 
       <ProductFormDialog
+        key={editingProduct ? editingProduct.id : formOpen ? "new-open" : "new-closed"}
         open={formOpen}
         onOpenChange={setFormOpen}
         product={editingProduct}

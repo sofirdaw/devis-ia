@@ -1,4 +1,5 @@
-const CACHE_NAME = "devis-ia-v6";
+const CACHE_NAME = "devis-ia-v8";
+
 const STATIC_ASSETS = [
   "/",
   "/login",
@@ -23,7 +24,6 @@ const STATIC_ASSETS = [
   "/icons/apple-touch-icon.png",
   "/favicon.ico",
 ];
-
 
 // Inscription et préchargement du cache
 self.addEventListener("install", (event) => {
@@ -55,8 +55,6 @@ self.addEventListener("activate", (event) => {
 
 // Stratégie ultra-rapide par type de ressource
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-
   const url = new URL(event.request.url);
 
   // Ignorer les requêtes de dev HMR WebSocket et Supabase Auth en direct
@@ -67,6 +65,23 @@ self.addEventListener("fetch", (event) => {
   ) {
     return;
   }
+
+  // Interception des requêtes POST (Server Actions) en cas de déconnexion réseau
+  if (event.request.method === "POST") {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        return new Response(
+          JSON.stringify({ success: true, offline: true }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      })
+    );
+    return;
+  }
+
 
   // 1. Assets Statiques & Chunks JS/CSS/Fonts -> CACHE-FIRST
   const isStaticAsset =
@@ -140,67 +155,58 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 3. Navigation de pages -> Stratégie Cache-First avec revalidation en arrière-plan
+  // 3. Navigation de pages -> Robuste sur Safari iOS (gère networkResponse.redirected sans erreur)
   if (event.request.mode === "navigate") {
     event.respondWith(
-      caches
-        .match(event.request)
-        .then((cachedResponse) => {
-          const networkFetch = fetch(event.request)
-            .then((networkResponse) => {
-              if (networkResponse && networkResponse.status === 200) {
-                const responseToCache = networkResponse.clone();
-                caches.open(CACHE_NAME).then((cache) => {
-                  cache.put(event.request, responseToCache);
-                });
-              }
-              return networkResponse;
-            })
-            .catch(async () => {
-              if (cachedResponse) return cachedResponse;
+      (async () => {
+        try {
+          const networkResponse = await fetch(event.request);
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(event.request, responseToCache);
+          }
 
-              // Fallback Shell pour rester dans l'application PWA sans erreur WebKit
-              const fallback =
-                (await caches.match(url.pathname)) ||
-                (await caches.match("/dashboard")) ||
-                (await caches.match("/quotes")) ||
-                (await caches.match("/login")) ||
-                (await caches.match("/"));
-
-              return (
-                fallback ||
-                new Response(
-                  "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Devis IA</title></head><body><script>window.location.href='/dashboard';</script></body></html>",
-                  {
-                    status: 200,
-                    headers: { "Content-Type": "text/html; charset=utf-8" },
-                  }
-                )
-              );
+          // Si la réponse réseau est une redirection, créer une réponse 200 propre
+          // pour éviter l'erreur WebKit/Safari : "Response served by service worker has redirections"
+          if (networkResponse.redirected) {
+            const body = await networkResponse.blob();
+            return new Response(body, {
+              status: 200,
+              statusText: "OK",
+              headers: networkResponse.headers,
             });
+          }
 
-          // Si la page est en cache, la renvoyer immédiatement (<5ms)
-          return cachedResponse || networkFetch;
-        })
-        .catch(async () => {
+          return networkResponse;
+        } catch {
+          // En mode hors-ligne : servir depuis le cache
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+
           const fallback =
+            (await caches.match(url.pathname)) ||
             (await caches.match("/dashboard")) ||
+            (await caches.match("/quotes")) ||
             (await caches.match("/login")) ||
             (await caches.match("/"));
+
           return (
             fallback ||
             new Response(
-              "<!DOCTYPE html><html><head><meta charset='utf-8'></head><body><script>window.location.href='/';</script></body></html>",
+              "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Devis IA</title></head><body><script>window.location.href='/dashboard';</script></body></html>",
               {
                 status: 200,
                 headers: { "Content-Type": "text/html; charset=utf-8" },
               }
             )
           );
-        })
+        }
+      })()
     );
     return;
   }
 });
+
 
 

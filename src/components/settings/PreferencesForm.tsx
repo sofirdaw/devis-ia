@@ -20,6 +20,7 @@ import {
 import { updateCompanyPreferencesAction } from "@/app/actions/company";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Company } from "@/types";
+import { useAuthStore } from "@/store/auth.store";
 
 interface PreferencesFormProps {
   company: Company;
@@ -31,14 +32,68 @@ export function PreferencesForm({ company }: PreferencesFormProps) {
   const action = updateCompanyPreferencesAction.bind(null, company.id);
   const [state, formAction, isPending] = useActionState(action, initialState);
   const [dismissed, setDismissed] = useState(false);
-  const showSuccess = Boolean(state.success && !dismissed);
+  const [localSuccess, setLocalSuccess] = useState(false);
+  const { setCompany, company: currentCompany } = useAuthStore();
+
+  // État contrôlé pour préserver les valeurs éditées
+  const [quotePrefix, setQuotePrefix] = useState(
+    currentCompany?.quote_prefix || company.quote_prefix || "DEV"
+  );
+  const [invoicePrefix, setInvoicePrefix] = useState(
+    currentCompany?.invoice_prefix || company.invoice_prefix || "FAC"
+  );
+  const [taxRate, setTaxRate] = useState<number | string>(
+    currentCompany?.tax_rate !== undefined
+      ? currentCompany.tax_rate
+      : company.tax_rate !== undefined
+        ? company.tax_rate
+        : 18
+  );
+
+  const showSuccess = Boolean((state.success || localSuccess) && !dismissed);
+
+  // Synchroniser vers useAuthStore (localStorage)
+  const syncToLocalStore = (newQPrefix: string, newIPrefix: string, newTax: number) => {
+    if (currentCompany) {
+      setCompany({
+        ...currentCompany,
+        quote_prefix: newQPrefix.toUpperCase(),
+        invoice_prefix: newIPrefix.toUpperCase(),
+        tax_rate: newTax,
+      });
+    }
+  };
 
   useEffect(() => {
     if (state.success) {
+      if (currentCompany) {
+        setCompany({
+          ...currentCompany,
+          quote_prefix: quotePrefix.toUpperCase(),
+          invoice_prefix: invoicePrefix.toUpperCase(),
+          tax_rate: Number(taxRate) || 0,
+        });
+      }
       const timer = setTimeout(() => setDismissed(true), 3000);
       return () => clearTimeout(timer);
     }
-  }, [state.success]);
+  }, [state.success, currentCompany, quotePrefix, invoicePrefix, taxRate, setCompany]);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    setDismissed(false);
+    const parsedTax = Number(taxRate) || 0;
+    syncToLocalStore(quotePrefix, invoicePrefix, parsedTax);
+
+    // En mode hors-ligne, éviter le crash réseau Server Action et marquer comme succès local
+    if (typeof window !== "undefined" && !navigator.onLine) {
+      e.preventDefault();
+      setLocalSuccess(true);
+      setTimeout(() => {
+        setLocalSuccess(false);
+        setDismissed(true);
+      }, 3000);
+    }
+  };
 
   return (
     <Card>
@@ -49,11 +104,7 @@ export function PreferencesForm({ company }: PreferencesFormProps) {
         </CardDescription>
       </CardHeader>
 
-      <form
-        action={formAction}
-        onSubmit={() => setDismissed(false)}
-        className="p-4 sm:p-6 lg:p-8 space-y-6"
-      >
+      <form action={formAction} onSubmit={handleSubmit} className="p-4 sm:p-6 lg:p-8 space-y-6">
         <CardBody className="p-0 space-y-4">
           {state.error && (
             <div
@@ -68,7 +119,11 @@ export function PreferencesForm({ company }: PreferencesFormProps) {
             <Input
               name="quote_prefix"
               label="Préfixe des devis"
-              defaultValue={company.quote_prefix}
+              value={quotePrefix}
+              onChange={(e) => {
+                setDismissed(false);
+                setQuotePrefix(e.target.value);
+              }}
               hint="Ex: DEV → DEV-2026-001"
               maxLength={10}
               required
@@ -76,7 +131,11 @@ export function PreferencesForm({ company }: PreferencesFormProps) {
             <Input
               name="invoice_prefix"
               label="Préfixe des factures"
-              defaultValue={company.invoice_prefix}
+              value={invoicePrefix}
+              onChange={(e) => {
+                setDismissed(false);
+                setInvoicePrefix(e.target.value);
+              }}
               hint="Ex: FAC → FAC-2026-001"
               maxLength={10}
               required
@@ -90,7 +149,11 @@ export function PreferencesForm({ company }: PreferencesFormProps) {
             max="100"
             step="0.5"
             label="Taux de TVA par défaut (%)"
-            defaultValue={company.tax_rate}
+            value={taxRate}
+            onChange={(e) => {
+              setDismissed(false);
+              setTaxRate(e.target.value);
+            }}
             hint="Laissez à 0 si vous n'appliquez pas de TVA"
             required
           />
@@ -98,9 +161,9 @@ export function PreferencesForm({ company }: PreferencesFormProps) {
 
         <CardFooter className="p-4 sm:p-6 lg:p-8 flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           {showSuccess ? (
-            <span className="flex items-center gap-1.5 text-sm text-green-600">
+            <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
               <CheckCircle2 size={14} />
-              Préférences enregistrées
+              Préférences enregistrées avec succès
             </span>
           ) : (
             <span />

@@ -45,10 +45,10 @@ export async function requireCurrentCompany(): Promise<Company> {
     }
   }
 
-  // Entreprise fallback en mode 100% hors-ligne (évite le crash WebKit)
+  // Entreprise fallback en mode 100% hors-ligne (UUID valide pour éviter l'erreur PostgreSQL 22P02)
   return {
-    id: "offline_company_id",
-    user_id: user?.id ?? "offline_user_id",
+    id: "00000000-0000-0000-0000-000000000000",
+    user_id: user?.id ?? "00000000-0000-0000-0000-000000000000",
     name: "Mon Entreprise",
     quote_prefix: "DEV",
     invoice_prefix: "FAC",

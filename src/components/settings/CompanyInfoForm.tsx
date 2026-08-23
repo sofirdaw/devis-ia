@@ -32,21 +32,34 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
   const action = updateCompanyAction.bind(null, company.id);
   const [state, formAction, isPending] = useActionState(action, initialState);
   const [dismissed, setDismissed] = useState(false);
-  const showSuccess = Boolean(state.success && !dismissed);
+  const [localSuccess, setLocalSuccess] = useState(false);
   const { setCompany, company: currentCompany } = useAuthStore();
 
   // État local pour les valeurs du formulaire
   const [formData, setFormData] = useState({
-    name: company.name,
-    phone: company.phone ?? "",
-    email: company.email ?? "",
-    address: company.address ?? "",
-    rccm: company.rccm ?? "",
-    ifu: company.ifu ?? "",
-    cme: company.cme ?? "",
-    default_quote_notes: company.default_quote_notes ?? "",
-    default_invoice_notes: company.default_invoice_notes ?? "",
+    name: currentCompany?.name || company.name || "",
+    phone: currentCompany?.phone ?? company.phone ?? "",
+    email: currentCompany?.email ?? company.email ?? "",
+    address: currentCompany?.address ?? company.address ?? "",
+    rccm: currentCompany?.rccm ?? company.rccm ?? "",
+    ifu: currentCompany?.ifu ?? company.ifu ?? "",
+    cme: currentCompany?.cme ?? company.cme ?? "",
+    default_quote_notes: currentCompany?.default_quote_notes ?? company.default_quote_notes ?? "",
+    default_invoice_notes:
+      currentCompany?.default_invoice_notes ?? company.default_invoice_notes ?? "",
   });
+
+  const showSuccess = Boolean((state.success || localSuccess) && !dismissed);
+
+  // Synchroniser vers le store Zustand
+  const syncToStore = (data: typeof formData) => {
+    if (currentCompany) {
+      setCompany({
+        ...currentCompany,
+        ...data,
+      });
+    }
+  };
 
   useEffect(() => {
     if (state.success) {
@@ -63,10 +76,26 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDismissed(false);
-    setFormData({
+    const updated = {
       ...formData,
       [e.target.name]: e.target.value,
-    });
+    };
+    setFormData(updated);
+    syncToStore(updated);
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    setDismissed(false);
+    syncToStore(formData);
+
+    if (typeof window !== "undefined" && !navigator.onLine) {
+      e.preventDefault();
+      setLocalSuccess(true);
+      setTimeout(() => {
+        setLocalSuccess(false);
+        setDismissed(true);
+      }, 3000);
+    }
   };
 
   return (
@@ -76,11 +105,7 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
         <CardDescription>Ces informations apparaissent sur vos devis et factures</CardDescription>
       </CardHeader>
 
-      <form
-        action={formAction}
-        onSubmit={() => setDismissed(false)}
-        className="p-4 sm:p-6 lg:p-8 space-y-6"
-      >
+      <form action={formAction} onSubmit={handleSubmit} className="p-4 sm:p-6 lg:p-8 space-y-6">
         <CardBody className="p-0 space-y-4">
           {state.error && (
             <div

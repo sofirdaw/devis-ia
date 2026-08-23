@@ -38,7 +38,22 @@ export function ProductFormDialog({
   const [quickSupplierOpen, setQuickSupplierOpen] = useState(false);
 
   const selectedSupplierId = customSupplierId ?? product?.supplier_id ?? "";
-  const supplierList = [...initialSuppliers, ...extraSuppliers];
+
+  // Déduplication stricte des fournisseurs par ID et par Nom
+  const rawList = [...initialSuppliers, ...extraSuppliers];
+  const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
+  const supplierList: Array<{ id: string; name: string }> = [];
+
+  for (const s of rawList) {
+    if (!s || !s.id) continue;
+    const normName = s.name?.trim().toLowerCase();
+    if (!seenIds.has(s.id) && (!normName || !seenNames.has(normName))) {
+      seenIds.add(s.id);
+      if (normName) seenNames.add(normName);
+      supplierList.push(s);
+    }
+  }
 
   const action = isEditMode ? updateProductAction.bind(null, product.id) : createProductAction;
 
