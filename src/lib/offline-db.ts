@@ -72,6 +72,16 @@ export interface OfflineSupplier {
   sync_status: "synced" | "pending_create" | "pending_update" | "pending_delete";
 }
 
+export interface OfflineClient {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  created_at: string;
+  sync_status: "synced" | "pending_create" | "pending_update" | "pending_delete";
+}
+
 export interface SyncQueueItem {
   id: string;
   action:
@@ -267,6 +277,49 @@ export async function deleteOfflineProduct(id: string): Promise<void> {
   });
 }
 
+// ── CLIENTS ────────────────────────────────────────────────────────────────
+
+export async function getOfflineClients(): Promise<OfflineClient[]> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction("clients", "readonly");
+      const store = transaction.objectStore("clients");
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.error("Erreur lecture clients IndexedDB:", err);
+    return [];
+  }
+}
+
+export async function saveOfflineClient(client: OfflineClient): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("clients", "readwrite");
+    const store = transaction.objectStore("clients");
+    const request = store.put(client);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteOfflineClient(id: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("clients", "readwrite");
+    const store = transaction.objectStore("clients");
+    const request = store.delete(id);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
 // ── FOURNISSEURS ────────────────────────────────────────────────────────────
 
 export async function getOfflineSuppliers(): Promise<OfflineSupplier[]> {
@@ -332,6 +385,24 @@ export async function addToSyncQueue(
     request.onsuccess = () => resolve(item.id);
     request.onerror = () => reject(request.error);
   });
+}
+
+// Note: l'enregistrement du Background Sync est fait côté client après
+// l'appel à `addToSyncQueue`. Cependant, pour compatibilité, on expose
+// une petite aide utilitaire ci-dessous que le client peut appeler.
+
+export async function registerBackgroundSync(tag = "devisia-sync"): Promise<void> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("SyncManager" in window)) return;
+
+  try {
+    const reg = (await navigator.serviceWorker.ready) as unknown as ServiceWorkerRegistration & { sync?: any };
+    if (reg && (reg as any).sync) {
+      await (reg as any).sync.register(tag);
+    }
+  } catch (err) {
+    // échec discret si le SyncManager n'est pas supporté
+    console.debug("Background Sync non disponible:", err);
+  }
 }
 
 export async function getSyncQueue(): Promise<SyncQueueItem[]> {

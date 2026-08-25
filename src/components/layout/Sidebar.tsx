@@ -89,15 +89,28 @@ const BOTTOM_ITEMS = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { company, reset } = useAuthStore();
+  const { company, logout } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
 
   // Déconnexion via Supabase Auth
   const handleLogout = async () => {
-    reset();
     const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
+    const isOffline = typeof window !== "undefined" && !navigator.onLine;
+
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.warn("Déconnexion Supabase non disponible hors ligne:", error);
+    }
+
+    logout();
+
+    if (isOffline) {
+      router.replace("/login");
+      return;
+    }
+
+    router.replace("/login");
   };
 
   // Fermer le menu mobile lors de la navigation

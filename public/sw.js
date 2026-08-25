@@ -1,31 +1,15 @@
-const CACHE_NAME = "devis-ia-v9";
+const CACHE_NAME = "devis-ia-v10";
 
 const STATIC_ASSETS = [
-  "/",
-  "/login",
-  "/register",
-  "/forgot-password",
-  "/dashboard",
-  "/quotes",
-  "/quotes/new",
-  "/quotes/ai",
-  "/invoices",
-  "/invoices/new",
-  "/invoices/ai",
-  "/clients",
-  "/products",
-  "/suppliers",
-  "/suppliers/new",
-  "/receivables",
-  "/settings",
-  "/setup",
+  "/offline.html",
+  "/favicon.ico",
   "/icons/icon-192x192.png",
   "/icons/icon-512x512.png",
   "/icons/apple-touch-icon.png",
-  "/favicon.ico",
+  "/icons/icon-maskable-512x512.png",
 ];
 
-// Inscription et préchargement du cache (résilient : chaque ressource est mise en cache indépendamment)
+// Installation et pré-chargement des ressources statiques critiques
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
@@ -38,7 +22,7 @@ self.addEventListener("install", (event) => {
               await cache.put(url, res);
             }
           } catch {
-            // Ignorer silencieusement pour continuer la mise en cache des autres routes
+            // Ignorer silencieusement si un asset n'est pas encore disponible
           }
         })
       );
@@ -47,13 +31,14 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
-// Nettoyage des anciens caches
+// Nettoyage immédiat des anciens caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
+            console.log("[SW] Suppression de l'ancien cache :", cache);
             return caches.delete(cache);
           }
         })
@@ -63,11 +48,12 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Stratégie ultra-rapide par type de ressource
+// Gestion des requêtes réseau & stratégies de mise en cache
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Ignorer les requêtes de dev HMR WebSocket et Supabase Auth en direct
+  // Ignorer les requêtes non-HTTP(S) et les outils de dev / Supabase
+  if (!url.protocol.startsWith("http")) return;
   if (
     url.pathname.startsWith("/_next/webpack-hmr") ||
     url.pathname.startsWith("/api/auth") ||
@@ -76,20 +62,83 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Interception des requêtes POST (Server Actions) en cas de déconnexion réseau
+  // Interception des requêtes POST (Server Actions) en cas de perte de connexion
   if (event.request.method === "POST") {
+    // Tenter d'envoyer au réseau ; en cas d'échec, stocker la requête
+    // dans IndexedDB (sync_queue) pour que le client la synchronise plus tard.
     event.respondWith(
-      fetch(event.request).catch(() => {
-        return new Response(JSON.stringify({ success: true, offline: true }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      })
+      (async () => {
+        try {
+          const networkResponse = await fetch(event.request.clone());
+          return networkResponse;
+        } catch (err) {
+          try {
+            // Lire le corps de la requête (JSON ou texte)
+            let body = null;
+            try {
+              body = await event.request.clone().json();
+            } catch (e) {
+              try {
+                body = await event.request.clone().text();
+              } catch (ee) {
+                body = null;
+              }
+            }
+
+            // Stocker dans IndexedDB sync_queue pour la reprise côté client
+            await (async function addToSyncQueue(payload) {
+              return new Promise((resolve) => {
+                const req = indexedDB.open("DevisIA_OfflineDB", 4);
+                req.onsuccess = function () {
+                  const db = req.result;
+                  const tx = db.transaction("sync_queue", "readwrite");
+                  const store = tx.objectStore("sync_queue");
+                  const item = {
+                    id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                    action: payload.action || "CREATE_QUOTE",
+                    payload: payload.body ?? {},
+                    created_at: new Date().toISOString(),
+                  };
+                  store.put(item);
+                  tx.oncomplete = () => resolve(true);
+                  tx.onerror = () => resolve(false);
+                };
+                req.onerror = () => resolve(false);
+              });
+            })({
+              action: (function guessAction(url) {
+                if (url.includes("/quotes")) return "CREATE_QUOTE";
+                if (url.includes("/invoices")) return "CREATE_INVOICE";
+                return "CREATE_QUOTE";
+              })(event.request.url),
+              body,
+            });
+            // Tenter d'enregistrer un Background Sync pour que le SW tente
+            // d'appeler l'événement 'sync' lorsque la connectivité revient.
+            try {
+              if (self.registration && self.registration.sync) {
+                await self.registration.sync.register('devisia-sync');
+              }
+            } catch (e) {
+              // Certains navigateurs ne supportent pas SyncManager; OK.
+            }
+          } catch (dbErr) {
+            // Silent fail
+            console.warn("SW: impossible d'écrire la sync_queue :", dbErr);
+          }
+
+          // Répondre immédiatement côté client pour conserver l'UX en offline
+          return new Response(JSON.stringify({ success: true, offline: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      })()
     );
     return;
   }
 
-  // 1. Assets Statiques & Chunks JS/CSS/Fonts -> CACHE-FIRST avec revalidation
+  // 1. Assets Statiques (JS, CSS, Polices, Images, Icônes) -> Cache-First avec revalidation en arrière-plan
   const isStaticAsset =
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
@@ -104,6 +153,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
         if (cachedResponse) {
+          // Revalider en arrière-plan
           fetch(event.request)
             .then((networkResponse) => {
               if (networkResponse && networkResponse.status === 200) {
@@ -130,7 +180,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 2. Next.js RSC Data & Prefetches (requêtes ?_rsc=... ou header RSC)
+  // 2. Requêtes Next.js RSC Data (?_rsc=... ou header RSC) -> Network First avec fallback cache
   const isRSCRequest =
     url.searchParams.has("_rsc") ||
     event.request.headers.get("RSC") === "1" ||
@@ -151,11 +201,9 @@ self.addEventListener("fetch", (event) => {
           const cached = await caches.match(event.request);
           if (cached) return cached;
 
-          // Si le RSC spécifique n'est pas en cache, chercher la route sans params
           const cachedBase = await caches.match(url.pathname);
           if (cachedBase) return cachedBase;
 
-          // Laisser échouer proprement pour que Next.js bascule sur la navigation de page
           return new Response(null, { status: 503, statusText: "Offline" });
         }
       })()
@@ -163,34 +211,24 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 3. Navigation de pages -> Robuste sur Safari iOS (gère networkResponse.redirected sans erreur)
+  // 3. Navigation de pages HTML -> Network First avec fallback propre
   if (event.request.mode === "navigate") {
     event.respondWith(
       (async () => {
         try {
-          const networkResponse = await fetch(event.request);
-          if (networkResponse && networkResponse.status === 200) {
+          const networkResponse = await fetch(event.request, { cache: "no-store" });
+
+          if (networkResponse && networkResponse.ok && !networkResponse.redirected) {
             const responseToCache = networkResponse.clone();
             const cache = await caches.open(CACHE_NAME);
             await cache.put(event.request, responseToCache);
             await cache.put(url.pathname, responseToCache.clone());
           }
 
-          // Si la réponse réseau est une redirection, créer une réponse 200 propre
-          // pour éviter l'erreur WebKit/Safari : "Response served by service worker has redirections"
-          if (networkResponse.redirected) {
-            const body = await networkResponse.blob();
-            return new Response(body, {
-              status: 200,
-              statusText: "OK",
-              headers: networkResponse.headers,
-            });
-          }
-
           return networkResponse;
         } catch {
-          // En mode hors-ligne : servir depuis le cache
-          const cached = (await caches.match(event.request)) || (await caches.match(url.pathname));
+          const cached =
+            (await caches.match(event.request)) || (await caches.match(url.pathname));
           if (cached) return cached;
 
           const fallback =
@@ -200,19 +238,19 @@ self.addEventListener("fetch", (event) => {
             (await caches.match("/products")) ||
             (await caches.match("/clients")) ||
             (await caches.match("/settings")) ||
-            (await caches.match("/login")) ||
-            (await caches.match("/"));
+            (await caches.match("/login"));
 
-          return (
-            fallback ||
-            new Response(
-              "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Devis IA</title></head><body><script>window.location.href='/dashboard';</script></body></html>",
-              {
-                status: 200,
-                headers: { "Content-Type": "text/html; charset=utf-8" },
-              }
-            )
-          );
+          if (fallback) return fallback;
+
+          const offlinePage = await caches.match("/offline.html");
+          if (offlinePage) return offlinePage;
+
+          return fetch("/offline.html", { cache: "no-store" }).catch(() => {
+            return new Response("Mode hors-ligne Devis IA", {
+              status: 200,
+              headers: { "Content-Type": "text/plain; charset=utf-8" },
+            });
+          });
         }
       })()
     );
@@ -220,6 +258,48 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
+    // Handler pour Background Sync: demander au client principal de lancer la synchro
+    self.addEventListener('sync', (event) => {
+      if (event.tag === 'devisia-sync') {
+        event.waitUntil((async () => {
+          try {
+            // Demander à tous les clients (fenêtres) de lancer la sync côté client
+            const clientList = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+            for (const client of clientList) {
+              try {
+                client.postMessage({ type: 'DEVISIA_SYNC' });
+              } catch (e) {
+                // ignore
+              }
+            }
 
-
-
+            // Optionnel: tenter un replay côté SW en lisant la sync_queue
+            // pour les environnements qui préfèrent que le SW fasse le travail.
+            try {
+              const req = indexedDB.open('DevisIA_OfflineDB', 4);
+              req.onsuccess = function () {
+                const db = req.result;
+                const tx = db.transaction('sync_queue', 'readonly');
+                const store = tx.objectStore('sync_queue');
+                const getAll = store.getAll();
+                getAll.onsuccess = async function () {
+                  const items = getAll.result || [];
+                  for (const it of items) {
+                    try {
+                      // Si une API REST existe côté serveur, on pourrait faire un fetch ici.
+                      // Ici on préfère laisser le client faire la sync via Server Actions.
+                    } catch (e) {
+                      // ignore
+                    }
+                  }
+                };
+              };
+            } catch (e) {
+              // ignore
+            }
+          } catch (err) {
+            console.error('SW sync handler failed', err);
+          }
+        })());
+      }
+    });

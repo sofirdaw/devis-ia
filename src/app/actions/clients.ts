@@ -54,7 +54,9 @@ export async function createClientAction(
 
   // En mode hors-ligne, on ne peut pas écrire dans Supabase — retour silencieux
   if (companyId === OFFLINE_UUID) {
-    return { error: "Impossible de créer un client hors-ligne. Reconnectez-vous pour synchroniser." };
+    return {
+      error: "Impossible de créer un client hors-ligne. Reconnectez-vous pour synchroniser.",
+    };
   }
 
   const supabase = await createClient();
@@ -74,7 +76,6 @@ export async function createClientAction(
   revalidatePath("/clients");
   return { success: true };
 }
-
 
 // ── UPDATE ───────────────────────────────────────────────────────────────────
 

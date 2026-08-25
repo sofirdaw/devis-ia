@@ -37,7 +37,9 @@ export async function createSupplierAction(
   }
 
   if (company.id === OFFLINE_UUID) {
-    return { error: "Impossible de créer un fournisseur hors-ligne. Reconnectez-vous pour synchroniser." };
+    return {
+      error: "Impossible de créer un fournisseur hors-ligne. Reconnectez-vous pour synchroniser.",
+    };
   }
 
   const supplierData: SupplierInsert = {
@@ -82,7 +84,9 @@ export async function createQuickSupplierAction(
   }
 
   if (company.id === OFFLINE_UUID) {
-    return { error: "Impossible de créer un fournisseur hors-ligne. Reconnectez-vous pour synchroniser." };
+    return {
+      error: "Impossible de créer un fournisseur hors-ligne. Reconnectez-vous pour synchroniser.",
+    };
   }
 
   const supabase = await createClient();

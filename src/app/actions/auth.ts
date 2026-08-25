@@ -198,5 +198,14 @@ export async function resetPasswordAction(
 export async function logoutAction(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
+
+  const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+  const isStandalone =
+    typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
+
+  if (isOffline || isStandalone) {
+    return;
+  }
+
   redirect("/login");
 }

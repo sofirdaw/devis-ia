@@ -105,4 +105,19 @@ export function initAutoSync() {
     console.log("📶 Connexion Internet rétablie. Démarrage de la synchronisation...");
     syncPendingData();
   });
+
+  // Écouter les messages en provenance du Service Worker (Background Sync déclenché)
+  if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) {
+    navigator.serviceWorker.addEventListener("message", (ev: MessageEvent) => {
+      try {
+        const data = ev.data || {};
+        if (data && data.type === "DEVISIA_SYNC") {
+          console.log("SW requested sync via message. Lancement de syncPendingData().");
+          syncPendingData();
+        }
+      } catch (e) {
+        // ignore
+      }
+    });
+  }
 }

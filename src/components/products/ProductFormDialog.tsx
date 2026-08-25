@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useRef } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { SupplierQuickCreateDialog } from "@/components/suppliers/SupplierQuickCreateDialog";
 import { createProductAction, updateProductAction } from "@/app/actions/products";
+import { OfflineActionNotice } from "@/components/pwa/OfflineActionNotice";
+import { saveOfflineProduct, addToSyncQueue, registerBackgroundSync } from "@/lib/offline-db";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Product, Supplier } from "@/types";
 
@@ -58,10 +60,67 @@ export function ProductFormDialog({
   const action = isEditMode ? updateProductAction.bind(null, product.id) : createProductAction;
 
   const [state, formAction, isPending] = useActionState(action, initialState);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const [isSavingOffline, setIsSavingOffline] = useState(false);
 
   useEffect(() => {
     if (state.success) onOpenChange(false);
   }, [state.success, onOpenChange]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    if (typeof window !== "undefined" && !navigator.onLine) {
+      if (isEditMode) {
+        e.preventDefault();
+        return;
+      }
+
+      e.preventDefault();
+      setIsSavingOffline(true);
+
+      const fd = new FormData(e.currentTarget as HTMLFormElement);
+      const name = String(fd.get("name") ?? "").trim();
+      const description = String(fd.get("description") ?? "").trim();
+      const supplier_id = String(fd.get("supplier_id") ?? "").trim() || null;
+      const priceRaw = fd.get("price");
+      const price = priceRaw ? Number(priceRaw) : 0;
+
+      const localId = `off_prod_${Date.now()}`;
+
+      const offlineProduct = {
+        id: localId,
+        name,
+        description: description || undefined,
+        unit_price: price,
+        cost_price: undefined,
+        unit: undefined,
+        category: undefined,
+        created_at: new Date().toISOString(),
+        sync_status: "pending_create" as const,
+      };
+
+      try {
+        await saveOfflineProduct(offlineProduct);
+        await addToSyncQueue("CREATE_PRODUCT", {
+          name,
+          description: description || null,
+          supplier_id: supplier_id || null,
+          price,
+          local_product: offlineProduct,
+        });
+
+        try {
+          await registerBackgroundSync();
+        } catch (err) {
+          // ignore
+        }
+      } catch (err) {
+        console.error("Erreur enregistrant produit hors-ligne:", err);
+      }
+
+      setIsSavingOffline(false);
+      onOpenChange(false);
+    }
+  };
 
   const handleSupplierCreated = (newSupplier: { id: string; name: string }) => {
     setExtraSuppliers((prev) => [...prev, newSupplier]);
@@ -89,7 +148,9 @@ export function ProductFormDialog({
             </div>
           )}
 
-          <form action={formAction} className="space-y-4">
+          <OfflineActionNotice />
+
+          <form ref={formRef} action={formAction} onSubmit={handleSubmit} className="space-y-4">
             <Input
               name="name"
               label="Nom du produit / service"
@@ -142,7 +203,7 @@ export function ProductFormDialog({
               required
             />
 
-            <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
               <Button
                 type="button"
                 variant="outline"
@@ -151,7 +212,7 @@ export function ProductFormDialog({
               >
                 Annuler
               </Button>
-              <Button type="submit" isLoading={isPending} className="w-full sm:w-auto">
+              <Button type="submit" isLoading={isPending || isSavingOffline} className="w-full sm:w-auto">
                 {isEditMode ? "Enregistrer" : "Ajouter"}
               </Button>
             </div>

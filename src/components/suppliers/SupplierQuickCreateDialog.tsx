@@ -5,6 +5,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createQuickSupplierAction } from "@/app/actions/suppliers";
+import { saveOfflineSupplier, addToSyncQueue, registerBackgroundSync } from "@/lib/offline-db";
 
 interface SupplierQuickCreateDialogProps {
   open: boolean;
@@ -27,6 +28,49 @@ export function SupplierQuickCreateDialog({
     e.preventDefault();
     setLoading(true);
     setError(null);
+    if (typeof window !== "undefined" && !navigator.onLine) {
+      // Offline quick create: save locally and queue sync
+      const localId = `off_sup_${Date.now()}`;
+      const offlineSupplier = {
+        id: localId,
+        name: name.trim(),
+        contact_name: undefined,
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+        address: null,
+        created_at: new Date().toISOString(),
+        sync_status: "pending_create" as const,
+      };
+
+      try {
+        await saveOfflineSupplier(offlineSupplier as any);
+        await addToSyncQueue("CREATE_SUPPLIER", {
+          name: offlineSupplier.name,
+          phone: offlineSupplier.phone || null,
+          email: offlineSupplier.email || null,
+          local_supplier: offlineSupplier,
+        });
+
+        try {
+          await registerBackgroundSync();
+        } catch (err) {
+          // ignore
+        }
+
+        setLoading(false);
+        onSupplierCreated({ id: offlineSupplier.id, name: offlineSupplier.name });
+        setName("");
+        setPhone("");
+        setEmail("");
+        onOpenChange(false);
+        return;
+      } catch (err) {
+        console.error("Erreur création rapide fournisseur hors-ligne:", err);
+        setLoading(false);
+        setError("Impossible de créer le fournisseur hors-ligne");
+        return;
+      }
+    }
 
     const res = await createQuickSupplierAction(name, phone, email);
 

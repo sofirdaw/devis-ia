@@ -26,6 +26,7 @@ export function RegisterSW() {
 
         // Pré-mise en cache en arrière-plan des routes principales après le chargement initial
         const coreRoutes = [
+          "/offline.html",
           "/dashboard",
           "/quotes",
           "/quotes/new",
@@ -56,4 +57,3 @@ export function RegisterSW() {
 
   return null;
 }
-

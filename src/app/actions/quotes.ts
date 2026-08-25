@@ -66,7 +66,6 @@ export async function createQuoteAction(
     valid_until: formData.get("valid_until"),
   });
 
-
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }

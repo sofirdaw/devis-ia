@@ -16,7 +16,7 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ className }: UserMenuProps = {}) {
-  const { user, company, reset, isLoading } = useAuthStore();
+  const { user, company, logout, isLoading } = useAuthStore();
   const router = useRouter();
 
   const [open, setOpen] = useState(false);
@@ -35,10 +35,23 @@ export function UserMenu({ className }: UserMenuProps = {}) {
 
   const handleSignOut = async () => {
     setOpen(false);
-    reset();
     const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
+    const isOffline = typeof window !== "undefined" && !navigator.onLine;
+
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.warn("Déconnexion Supabase non disponible hors ligne:", error);
+    }
+
+    logout();
+
+    if (isOffline) {
+      router.replace("/login");
+      return;
+    }
+
+    router.replace("/login");
   };
 
   const handleOpenSettings = () => {

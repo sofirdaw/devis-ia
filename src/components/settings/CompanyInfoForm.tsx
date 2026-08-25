@@ -33,58 +33,48 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
   const [state, formAction, isPending] = useActionState(action, initialState);
   const [dismissed, setDismissed] = useState(false);
   const [localSuccess, setLocalSuccess] = useState(false);
-  const { setCompany, company: currentCompany } = useAuthStore();
 
-  // Base de données : store Zustand en priorité, props serveur en fallback
-  const base = currentCompany ?? company;
+  // Valeurs initiales basées sur le store ou les props serveur
+  const initialCompany = useAuthStore.getState().company ?? company;
 
   // État local pour les valeurs du formulaire
   const [formData, setFormData] = useState({
-    name: base.name || "",
-    phone: base.phone ?? "",
-    email: base.email ?? "",
-    address: base.address ?? "",
-    rccm: (base as typeof company).rccm ?? "",
-    ifu: (base as typeof company).ifu ?? "",
-    cme: (base as typeof company).cme ?? "",
-    default_quote_notes: (base as typeof company).default_quote_notes ?? "",
-    default_invoice_notes: (base as typeof company).default_invoice_notes ?? "",
+    name: initialCompany.name || "",
+    phone: initialCompany.phone ?? "",
+    email: initialCompany.email ?? "",
+    address: initialCompany.address ?? "",
+    rccm: (initialCompany as typeof company).rccm ?? "",
+    ifu: (initialCompany as typeof company).ifu ?? "",
+    cme: (initialCompany as typeof company).cme ?? "",
+    default_quote_notes: (initialCompany as typeof company).default_quote_notes ?? "",
+    default_invoice_notes: (initialCompany as typeof company).default_invoice_notes ?? "",
   });
 
   const showSuccess = Boolean((state.success || localSuccess) && !dismissed);
 
-  // Synchroniser vers le store Zustand (fonctionne même si currentCompany est null)
-  const syncToStore = (data: typeof formData) => {
-    setCompany({
-      ...(currentCompany ?? company),
-      ...data,
-    });
-  };
-
+  // Fermer le message de succès après 3 secondes
   useEffect(() => {
     if (state.success) {
-      setCompany({
-        ...(currentCompany ?? company),
-        ...formData,
-      });
       const timer = setTimeout(() => setDismissed(true), 3000);
       return () => clearTimeout(timer);
     }
-  }, [state.success, currentCompany, company, formData, setCompany]);
+  }, [state.success]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDismissed(false);
-    const updated = {
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [e.target.name]: e.target.value,
-    };
-    setFormData(updated);
-    syncToStore(updated);
+    }));
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     setDismissed(false);
-    syncToStore(formData);
+    const current = useAuthStore.getState().company ?? company;
+    useAuthStore.getState().setCompany({
+      ...current,
+      ...formData,
+    });
 
     if (typeof window !== "undefined" && !navigator.onLine) {
       e.preventDefault();
@@ -95,7 +85,6 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
       }, 3000);
     }
   };
-
 
   return (
     <Card>

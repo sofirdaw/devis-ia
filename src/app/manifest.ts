@@ -6,7 +6,8 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Devis IA",
     description:
       "Générez et gérez vos devis et factures professionnels avec ou sans connexion Internet.",
-    start_url: "/",
+    start_url: "/dashboard",
+    id: "/dashboard",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#2563eb",

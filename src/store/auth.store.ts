@@ -20,6 +20,7 @@ type AuthState = {
   setCompany: (company: Company | null) => void;
   setLoading: (loading: boolean) => void;
   reset: () => void; // Appelé à la déconnexion
+  logout: () => void;
 };
 
 export const useAuthStore = create<AuthState>()(
@@ -35,6 +36,12 @@ export const useAuthStore = create<AuthState>()(
 
       // Réinitialise tout l'état (utilisé lors du logout)
       reset: () => set({ user: null, company: null, isLoading: false }),
+      logout: () => {
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem("devis_ia_auth_storage");
+        }
+        set({ user: null, company: null, isLoading: false });
+      },
     }),
     {
       name: "devis_ia_auth_storage",

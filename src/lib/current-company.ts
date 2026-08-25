@@ -107,4 +107,3 @@ export async function getCurrentCompanyForAction(): Promise<Company | null> {
     created_at: new Date().toISOString(),
   } as unknown as Company;
 }
-

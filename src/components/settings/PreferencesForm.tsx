@@ -33,18 +33,19 @@ export function PreferencesForm({ company }: PreferencesFormProps) {
   const [state, formAction, isPending] = useActionState(action, initialState);
   const [dismissed, setDismissed] = useState(false);
   const [localSuccess, setLocalSuccess] = useState(false);
-  const { setCompany, company: currentCompany } = useAuthStore();
+
+  const initialCompany = useAuthStore.getState().company ?? company;
 
   // État contrôlé pour préserver les valeurs éditées
   const [quotePrefix, setQuotePrefix] = useState(
-    currentCompany?.quote_prefix || company.quote_prefix || "DEV"
+    initialCompany.quote_prefix || company.quote_prefix || "DEV"
   );
   const [invoicePrefix, setInvoicePrefix] = useState(
-    currentCompany?.invoice_prefix || company.invoice_prefix || "FAC"
+    initialCompany.invoice_prefix || company.invoice_prefix || "FAC"
   );
   const [taxRate, setTaxRate] = useState<number | string>(
-    currentCompany?.tax_rate !== undefined
-      ? currentCompany.tax_rate
+    initialCompany.tax_rate !== undefined
+      ? initialCompany.tax_rate
       : company.tax_rate !== undefined
         ? company.tax_rate
         : 18
@@ -52,34 +53,23 @@ export function PreferencesForm({ company }: PreferencesFormProps) {
 
   const showSuccess = Boolean((state.success || localSuccess) && !dismissed);
 
-  // Synchroniser vers useAuthStore (localStorage) — fonctionne même si currentCompany est null
-  const syncToLocalStore = (newQPrefix: string, newIPrefix: string, newTax: number) => {
-    setCompany({
-      ...(currentCompany ?? company),
-      quote_prefix: newQPrefix.toUpperCase(),
-      invoice_prefix: newIPrefix.toUpperCase(),
-      tax_rate: newTax,
-    });
-  };
-
   useEffect(() => {
     if (state.success) {
-      setCompany({
-        ...(currentCompany ?? company),
-        quote_prefix: quotePrefix.toUpperCase(),
-        invoice_prefix: invoicePrefix.toUpperCase(),
-        tax_rate: Number(taxRate) || 0,
-      });
       const timer = setTimeout(() => setDismissed(true), 3000);
       return () => clearTimeout(timer);
     }
-  }, [state.success, currentCompany, company, quotePrefix, invoicePrefix, taxRate, setCompany]);
-
+  }, [state.success]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     setDismissed(false);
     const parsedTax = Number(taxRate) || 0;
-    syncToLocalStore(quotePrefix, invoicePrefix, parsedTax);
+    const current = useAuthStore.getState().company ?? company;
+    useAuthStore.getState().setCompany({
+      ...current,
+      quote_prefix: quotePrefix.toUpperCase(),
+      invoice_prefix: invoicePrefix.toUpperCase(),
+      tax_rate: parsedTax,
+    });
 
     // En mode hors-ligne, éviter le crash réseau Server Action et marquer comme succès local
     if (typeof window !== "undefined" && !navigator.onLine) {

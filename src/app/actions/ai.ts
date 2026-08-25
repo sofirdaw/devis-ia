@@ -14,6 +14,7 @@ import {
   extractDocumentFromTextWithFallback,
   extractDocumentFromImageWithFallback,
 } from "@/lib/ai-provider";
+import { parseDocumentOfflineText } from "@/lib/offline-parser";
 import type { Product } from "@/types";
 
 // ── Type de retour de l'extraction IA ─────────────────────────────────────────
@@ -68,6 +69,59 @@ function buildCatalogContext(products: Product[]): string {
   return `\n\nCatalogue produits existants de l'entreprise (réutilise EXACTEMENT ces noms et prix si l'utilisateur les mentionne, même approximativement) :\n${catalogList}`;
 }
 
+function looksLikeMalformedAIItem(item: { designation: string; quantity?: number; unit_price?: number }) {
+  const designation = (item.designation ?? "").trim();
+  if (!designation) return true;
+
+  const hasHeaderNoise = /(articles?|désignation|designation|quantité|quantite|prix unitaire|total ht|total ttc)/i.test(designation);
+  const hasPriceInName = /\s+à\s+\d{2,}(?:[\s.,]\d{3})*(?:\s*(?:fcfa|cfa|f))?/i.test(designation);
+  const hasCommaThenWord = /,\s*(installation|maintenance|livraison|service|forfait|article|livre)/i.test(designation);
+
+  return hasHeaderNoise || hasPriceInName || hasCommaThenWord;
+}
+
+function sanitizeAIItems(
+  items: Array<{ designation: string; quantity: number; unit_price: number; product_id?: string | null }>,
+  description: string,
+  clients: Array<{ id: string; name: string }>,
+  products: Product[]
+): Array<{ product_id: string | null; designation: string; quantity: number; unit_price: number }> {
+  if (items.length === 0) return items as Array<{ product_id: string | null; designation: string; quantity: number; unit_price: number }>;
+
+  const hasMalformed = items.some((item) => looksLikeMalformedAIItem(item));
+  if (!hasMalformed) {
+    return items.map((item) => ({
+      product_id: item.product_id ?? null,
+      designation: item.designation,
+      quantity: item.quantity || 1,
+      unit_price: item.unit_price ?? 0,
+    }));
+  }
+
+  const fallback = parseDocumentOfflineText(description, clients as any, products);
+  if (!fallback.success || !fallback.data) {
+    return items.map((item) => ({
+      product_id: item.product_id ?? null,
+      designation: item.designation,
+      quantity: item.quantity || 1,
+      unit_price: item.unit_price ?? 0,
+    }));
+  }
+
+  return fallback.data.items.map((item) => {
+    const matchedProduct = products.find(
+      (p) => p.name.toLowerCase() === item.designation.toLowerCase()
+    );
+
+    return {
+      product_id: matchedProduct?.id ?? null,
+      designation: matchedProduct?.name ?? item.designation,
+      quantity: item.quantity || 1,
+      unit_price: matchedProduct?.price ?? item.unit_price ?? 0,
+    };
+  });
+}
+
 // ── Action principale : extraction IA depuis un texte libre ───────────────────
 
 export async function generateDocumentFromText(description: string): Promise<AIExtractionResult> {
@@ -113,18 +167,17 @@ export async function generateDocumentFromText(description: string): Promise<AIE
     : undefined;
 
   // ── Faire correspondre chaque ligne à un produit existant si possible ────────
-  const items = parsed.items.map((item) => {
-    const matchedProduct = (context.products as Product[]).find(
-      (p) => p.name.toLowerCase() === item.designation.toLowerCase()
-    );
-
-    return {
-      product_id: matchedProduct?.id ?? null,
-      designation: matchedProduct?.name ?? item.designation,
+  const items = sanitizeAIItems(
+    parsed.items.map((item) => ({
+      product_id: null,
+      designation: item.designation,
       quantity: item.quantity || 1,
-      unit_price: matchedProduct?.price ?? item.unit_price ?? 0,
-    };
-  });
+      unit_price: item.unit_price ?? 0,
+    })),
+    description,
+    context.clients,
+    context.products as Product[]
+  );
 
   return {
     success: true,
@@ -184,18 +237,17 @@ export async function generateDocumentFromImage(imageBase64: string): Promise<AI
       )
     : undefined;
 
-  const items = parsed.items.map((item) => {
-    const matchedProduct = (context.products as Product[]).find(
-      (p) => p.name.toLowerCase() === item.designation.toLowerCase()
-    );
-
-    return {
-      product_id: matchedProduct?.id ?? null,
-      designation: matchedProduct?.name ?? item.designation,
+  const items = sanitizeAIItems(
+    parsed.items.map((item) => ({
+      product_id: null,
+      designation: item.designation,
       quantity: item.quantity || 1,
-      unit_price: matchedProduct?.price ?? item.unit_price ?? 0,
-    };
-  });
+      unit_price: item.unit_price ?? 0,
+    })),
+    `Image analysée : ${parsed.client_name ?? ""}`,
+    context.clients,
+    context.products as Product[]
+  );
 
   return {
     success: true,

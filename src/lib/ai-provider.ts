@@ -41,6 +41,7 @@ interface ProviderTarget {
 
 /**
  * Extrait les clés d'environnement sous forme de tableau (supporte les clés multiples séparées par des virgules)
+ * Ignore automatiquement les clés de template/placeholder (ex: "votre_cle_openai")
  */
 function getApiKeys(envVarName: string): string[] {
   const value = process.env[envVarName];
@@ -48,7 +49,14 @@ function getApiKeys(envVarName: string): string[] {
   return value
     .split(",")
     .map((k) => k.trim())
-    .filter((k) => k.length > 0);
+    .filter(
+      (k) =>
+        k.length > 0 &&
+        !k.startsWith("votre_") &&
+        !k.startsWith("your_") &&
+        k !== "undefined" &&
+        k !== "null"
+    );
 }
 
 /**
@@ -325,20 +333,22 @@ export async function extractDocumentFromImageWithFallback(
     {
       type: "text",
       text: `Tu es un expert en reconnaissance d'écriture manuscrite (OCR manuscrit) et en analyse de documents commerciaux (devis, factures, reçus, carnets de notes, bons de commande manuscrits ou imprimés).
-Analyse minutieusement cette image (même si elle est écrite à la main, froissée, penchée ou prise en photo avec un smartphone) et extrais :
+Analyse minutieusement cette image et extrais uniquement les données utiles :
 1. "client_name" : le nom du client (particulier ou entreprise), ou chaîne vide si absent.
 2. "items" : la liste de tous les articles/prestations trouvés :
-   - "designation" : nom clair du produit ou service (déchiffre l'écriture manuscrite avec soin).
-   - "quantity" : quantité numérique (1 par défaut si non spécifié).
-   - "unit_price" : prix unitaire numérique (sans symbole monétaire).
+   - "designation" : UNIQUEMENT et STRICTEMENT le nom de l'article ou de la prestation (ex: "Powerbank", "Sac", "Installation caméra"). Ne JAMAIS inclure de phrase d'instruction, d'en-têtes de tableau (ex: "Quantité", "Total"), ni de texte de copyright/bruit OCR.
+   - "quantity" : quantité numérique entière (1 par défaut si non spécifié).
+   - "unit_price" : prix unitaire numérique en FCFA (sans symbole monétaire, ex: 15000, 20000).
 3. "notes" : notes explicatives ou conditions particulières visibles.
 4. "date" : date au format YYYY-MM-DD (ou "${todayDate}" si absente).
+
+Ignore tout bruit OCR, logo ou ligne de titre générique.
 
 Réponds STRICTEMENT avec ce format JSON valide, sans aucun texte autour :
 {
   "client_name": "nom du client",
   "items": [
-    { "designation": "nom de l'article ou service", "quantity": 1, "unit_price": 10000 }
+    { "designation": "Nom article", "quantity": 1, "unit_price": 10000 }
   ],
   "notes": "notes ou conditions",
   "date": "${todayDate}"

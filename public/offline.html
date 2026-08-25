@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <meta name="theme-color" content="#2563eb" />
+    <title>Mode Hors-Ligne — Devis IA</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      }
+      body {
+        background-color: #f8fafc;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 1.5rem;
+      }
+      .card {
+        background: #ffffff;
+        border-radius: 1.25rem;
+        box-shadow:
+          0 10px 25px -5px rgba(0, 0, 0, 0.05),
+          0 8px 10px -6px rgba(0, 0, 0, 0.03);
+        border: 1px solid #e2e8f0;
+        max-width: 28rem;
+        width: 100%;
+        padding: 2rem;
+        text-align: center;
+      }
+      .icon-container {
+        width: 4.5rem;
+        height: 4.5rem;
+        background: #eff6ff;
+        color: #2563eb;
+        border-radius: 1.25rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+      }
+      .icon-container svg {
+        width: 2.25rem;
+        height: 2.25rem;
+      }
+      h1 {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 0.5rem;
+      }
+      p {
+        font-size: 0.925rem;
+        color: #64748b;
+        line-height: 1.5;
+        margin-bottom: 1.75rem;
+      }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.925rem;
+        font-weight: 600;
+        padding: 0.75rem 1.25rem;
+        border-radius: 0.75rem;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        border: none;
+      }
+      .btn-primary {
+        background-color: #2563eb;
+        color: #ffffff;
+      }
+      .btn-primary:hover {
+        background-color: #1d4ed8;
+      }
+      .btn-secondary {
+        background-color: #f1f5f9;
+        color: #334155;
+      }
+      .btn-secondary:hover {
+        background-color: #e2e8f0;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #d97706;
+        background: #fef3c7;
+        padding: 0.25rem 0.65rem;
+        border-radius: 9999px;
+        margin-bottom: 1rem;
+      }
+      .badge-dot {
+        width: 6px;
+        height: 6px;
+        background: #d97706;
+        border-radius: 50%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="badge">
+        <span class="badge-dot"></span>
+        Mode Hors-Ligne
+      </div>
+      <div class="icon-container">
+        <svg
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 4.243a9 9 0 01-12.728 0m0 0l2.829-2.829m-2.829 2.829L3 21m2.828-12.536a5 5 0 017.072 0m-7.072 0l2.829 2.829M12 12h.01"
+          ></path>
+        </svg>
+      </div>
+      <h1>Vous êtes hors connexion</h1>
+      <p>
+        Cette page n'est pas encore disponible en cache, mais vous pouvez continuer à utiliser
+        l'application avec vos données locales enregistrées.
+      </p>
+      <div class="actions">
+        <a href="/dashboard" class="btn btn-primary">Tableau de bord hors-ligne</a>
+        <a href="/quotes" class="btn btn-secondary">Consulter mes devis</a>
+        <a href="/invoices" class="btn btn-secondary">Consulter mes factures</a>
+        <button onclick="window.location.reload()" class="btn btn-secondary">
+          Réessayer la connexion
+        </button>
+      </div>
+    </div>
+  </body>
+</html>

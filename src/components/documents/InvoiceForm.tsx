@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { LineItemsEditor, type LineItem } from "./LineItemsEditor";
 import { TotalsSummary } from "./TotalsSummary";
 import { createInvoiceAction } from "@/app/actions/invoices";
-import { saveOfflineInvoice, addToSyncQueue } from "@/lib/offline-db";
+import { saveOfflineInvoice, addToSyncQueue, registerBackgroundSync } from "@/lib/offline-db";
+import { OfflineActionNotice } from "@/components/pwa/OfflineActionNotice";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Client, Product } from "@/types";
 
@@ -137,6 +138,13 @@ export function InvoiceForm({
           local_invoice: offlineInvoice,
         });
 
+        // Tenter d'enregistrer le Background Sync si disponible
+        try {
+          await registerBackgroundSync();
+        } catch (e) {
+          // ignore
+        }
+
         router.push("/invoices");
       } catch (err) {
         console.error("Erreur sauvegarde facture hors-ligne:", err);
@@ -148,6 +156,7 @@ export function InvoiceForm({
 
   return (
     <form ref={formRef} action={formAction} onSubmit={handleSubmit} className="space-y-6">
+      <OfflineActionNotice />
       {state.error && (
         <div
           className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"

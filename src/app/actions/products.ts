@@ -52,7 +52,9 @@ export async function createProductAction(
   if (!companyId) return { error: "Entreprise introuvable" };
 
   if (companyId === OFFLINE_UUID) {
-    return { error: "Impossible de créer un produit hors-ligne. Reconnectez-vous pour synchroniser." };
+    return {
+      error: "Impossible de créer un produit hors-ligne. Reconnectez-vous pour synchroniser.",
+    };
   }
 
   const supabase = await createClient();

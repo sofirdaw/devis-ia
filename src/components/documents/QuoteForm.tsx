@@ -19,7 +19,8 @@ import { LineItemsEditor, type LineItem } from "./LineItemsEditor";
 import { TotalsSummary } from "./TotalsSummary";
 import { createQuoteAction } from "@/app/actions/quotes";
 import { useRouter } from "next/navigation";
-import { saveOfflineQuote, addToSyncQueue } from "@/lib/offline-db";
+import { saveOfflineQuote, addToSyncQueue, registerBackgroundSync } from "@/lib/offline-db";
+import { OfflineActionNotice } from "@/components/pwa/OfflineActionNotice";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Client, Product } from "@/types";
 
@@ -65,7 +66,6 @@ export function QuoteForm({
 
   const clientOptions = clients.map((c) => ({ value: c.id, label: c.name }));
   const selectedClient = clients.find((c) => c.id === selectedClientId);
-
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     if (typeof window !== "undefined" && !navigator.onLine) {
@@ -114,6 +114,13 @@ export function QuoteForm({
         local_quote: offlineQuote,
       });
 
+      // Tenter d'enregistrer le Background Sync si disponible
+      try {
+        await registerBackgroundSync();
+      } catch (e) {
+        // ignore
+      }
+
       setIsSavingOffline(false);
       router.push("/quotes");
     }
@@ -121,6 +128,7 @@ export function QuoteForm({
 
   return (
     <form ref={formRef} action={formAction} onSubmit={handleSubmit} className="space-y-6">
+      <OfflineActionNotice />
       {state.error && (
         <div
           className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"
