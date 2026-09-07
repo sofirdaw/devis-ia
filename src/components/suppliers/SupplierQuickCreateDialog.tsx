@@ -37,13 +37,13 @@ export function SupplierQuickCreateDialog({
         contact_name: undefined,
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
-        address: null,
+        address: undefined,
         created_at: new Date().toISOString(),
         sync_status: "pending_create" as const,
       };
 
       try {
-        await saveOfflineSupplier(offlineSupplier as any);
+        await saveOfflineSupplier(offlineSupplier);
         await addToSyncQueue("CREATE_SUPPLIER", {
           name: offlineSupplier.name,
           phone: offlineSupplier.phone || null,
@@ -53,7 +53,7 @@ export function SupplierQuickCreateDialog({
 
         try {
           await registerBackgroundSync();
-        } catch (err) {
+        } catch {
           // ignore
         }
 

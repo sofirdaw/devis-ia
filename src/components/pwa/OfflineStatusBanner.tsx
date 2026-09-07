@@ -43,7 +43,13 @@ export function OfflineStatusBanner() {
             : "border-amber-200 bg-amber-50 text-amber-700",
         ].join(" ")}
       >
-        {isSyncing ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : isOnline ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+        {isSyncing ? (
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+        ) : isOnline ? (
+          <Wifi className="h-3.5 w-3.5" />
+        ) : (
+          <WifiOff className="h-3.5 w-3.5" />
+        )}
         <span>
           {isSyncing
             ? "Synchronisation en cours…"

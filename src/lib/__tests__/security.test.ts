@@ -30,7 +30,7 @@ describe("Tests de Sécurité & Résistance aux Injections", () => {
     const duration = performance.now() - start;
 
     expect(result).toBeDefined();
-    // Doit traiter la chaîne géante en moins de 100ms sans geler le thread
+    // La taille est rejetée avant les regex coûteuses, sans geler le thread.
     expect(duration).toBeLessThan(200);
   });
 

@@ -8,3 +8,5 @@ package-lock.json
 public/sw.js
 .eslint-report.txt
 *.log
+playwright-report
+test-results

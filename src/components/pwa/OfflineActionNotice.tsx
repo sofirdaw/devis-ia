@@ -28,7 +28,8 @@ export function OfflineActionNotice() {
       <div className="flex-1">
         <p className="font-semibold">Mode hors ligne actif</p>
         <p className="text-xs text-amber-700">
-          Les données seront enregistrées localement et synchronisées automatiquement dès que la connexion revient.
+          Les données seront enregistrées localement et synchronisées automatiquement dès que la
+          connexion revient.
         </p>
       </div>
       <CloudUpload className="h-4 w-4 shrink-0" />

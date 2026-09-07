@@ -58,7 +58,7 @@ export function VoiceInputButton({ onTranscript, disabled }: VoiceInputButtonPro
       return;
     }
 
-    setIsSupported(true);
+    const supportTimer = window.setTimeout(() => setIsSupported(true), 0);
 
     const recognition = new SpeechRecognitionAPI();
     recognition.lang = "fr-FR";
@@ -77,6 +77,7 @@ export function VoiceInputButton({ onTranscript, disabled }: VoiceInputButtonPro
     recognitionRef.current = recognition;
 
     return () => {
+      window.clearTimeout(supportTimer);
       recognition.stop();
     };
   }, [onTranscript]);

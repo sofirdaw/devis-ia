@@ -2,7 +2,7 @@
  * SupplierForm — Formulaire de création/édition de fournisseur
  */
 
-"use client"; 
+"use client";
 import { useRef, useState } from "react";
 
 import { useActionState } from "react";
@@ -99,7 +99,10 @@ export function SupplierForm({ supplier }: SupplierFormProps) {
       )}
 
       {localError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm" role="alert">
+        <div
+          className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"
+          role="alert"
+        >
           {localError}
         </div>
       )}

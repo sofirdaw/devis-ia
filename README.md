@@ -62,6 +62,10 @@ Créez un fichier `.env.local` à la racine du projet :
 NEXT_PUBLIC_SUPABASE_URL=votre_url_supabase
 NEXT_PUBLIC_SUPABASE_ANON_KEY=votre_cle_anon_supabase
 
+# Cache Redis (Upstash, Redis Cloud ou Redis managé)
+# Laisser vide en développement désactive le cache sans bloquer l'application.
+REDIS_URL=redis://:mot_de_passe@hote:6379
+
 # Clerk
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=votre_cle_publique_clerk
 CLERK_SECRET_KEY=votre_cle_secrete_clerk
@@ -70,6 +74,12 @@ CLERK_SECRET_KEY=votre_cle_secrete_clerk
 OPENAI_API_KEY=votre_cle_openai
 GROQ_API_KEY=votre_cle_groq  # Optionnel, alternative gratuite
 ```
+
+Après avoir appliqué `supabase/migrations/migration_add_subscriptions.sql` dans
+Supabase, les entreprises disposent des dates `trial_started_at` et
+`trial_ends_at` pour l'essai gratuit, ainsi que `subscription_started_at` et
+`subscription_expires_at` pour les abonnements payants. Un administrateur peut
+suspendre ou réactiver un compte depuis `/admin/subscriptions`.
 
 ### 6. Lancer le projet
 
@@ -133,7 +143,6 @@ Toutes les tables sont protégées par Row Level Security (RLS) pour garantir qu
 
 ## 🔐 Sécurité
 
-- **Authentification** : Clerk avec gestion des sessions
 - **Autorisation** : Row Level Security sur Supabase
 - **Validation** : Zod pour la validation des formulaires
 - **Protection** : Server Actions pour les opérations sensibles
@@ -195,4 +204,5 @@ Pour toute question ou problème :
 - Consultez la documentation Next.js
 - Consultez la documentation Supabase
 - Consultez la documentation Clerk
+
 # devis-ia

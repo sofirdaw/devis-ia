@@ -392,12 +392,19 @@ export async function addToSyncQueue(
 // une petite aide utilitaire ci-dessous que le client peut appeler.
 
 export async function registerBackgroundSync(tag = "devisia-sync"): Promise<void> {
-  if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("SyncManager" in window)) return;
+  if (
+    typeof window === "undefined" ||
+    !("serviceWorker" in navigator) ||
+    !("SyncManager" in window)
+  )
+    return;
 
   try {
-    const reg = (await navigator.serviceWorker.ready) as unknown as ServiceWorkerRegistration & { sync?: any };
-    if (reg && (reg as any).sync) {
-      await (reg as any).sync.register(tag);
+    const reg = (await navigator.serviceWorker.ready) as ServiceWorkerRegistration & {
+      sync?: { register: (tag: string) => Promise<void> };
+    };
+    if (reg.sync) {
+      await reg.sync.register(tag);
     }
   } catch (err) {
     // échec discret si le SyncManager n'est pas supporté

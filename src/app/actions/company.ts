@@ -12,6 +12,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionResult } from "./auth";
+import { companyCacheKey, dashboardCacheKey, invalidateCache } from "@/lib/cache";
 
 const CompanySchema = z.object({
   name: z.string().min(2, "Le nom de l'entreprise est requis"),
@@ -85,6 +86,9 @@ export async function createCompanyAction(
       cme: parsed.data.cme || null,
       default_quote_notes: parsed.data.default_quote_notes || null,
       default_invoice_notes: parsed.data.default_invoice_notes || null,
+      subscription_status: "trial",
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     })
     .select("id")
     .single();
@@ -214,6 +218,13 @@ export async function updateCompanyAction(
   if (error) {
     console.error("Erreur update company:", error);
     return { error: `Erreur lors de la mise à jour: ${error.message}` };
+  }
+
+  const {
+    data: { user: updatedByUser },
+  } = await supabase.auth.getUser();
+  if (updatedByUser) {
+    await invalidateCache(companyCacheKey(updatedByUser.id), dashboardCacheKey(targetCompanyId));
   }
 
   return { success: true };

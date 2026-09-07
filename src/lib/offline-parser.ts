@@ -74,11 +74,17 @@ const IGNORED_KEYWORDS = [
   "remise",
 ];
 
+const MAX_DESCRIPTION_LENGTH = 100_000;
+
 export function parseDocumentOfflineText(
   description: string,
   clients: Client[] = [],
   products: Product[] = []
 ): AIExtractionResult {
+  if (description.length > MAX_DESCRIPTION_LENGTH) {
+    return { success: false, error: "La description est trop longue à analyser." };
+  }
+
   const text = description.trim();
   if (!text) {
     return { success: false, error: "Veuillez saisir une description" };
@@ -131,13 +137,18 @@ export function parseDocumentOfflineText(
 
   // Nettoyer les phrases de liaison d'introduction
   workingText = workingText
-    .replace(/^(?:pour\s+)?(?:achat|acheté|achat\s+de|achat\s+d'|vente\s+de|fourniture\s+de)\s+/i, "")
+    .replace(
+      /^(?:pour\s+)?(?:achat|acheté|achat\s+de|achat\s+d'|vente\s+de|fourniture\s+de)\s+/i,
+      ""
+    )
     .replace(/^[:\-–=,\.]\s*/, "")
     .trim();
 
   // 2. Découpage en segments d'articles
   const rawSegments = workingText
-    .split(/[\n,;+]|\b(?:et\s+(?:un|une|le|la|les|d'|l'|\d+)|et\b|puis\b|ainsi que\b|avec\s+(?:un|une|\d+))\b/i)
+    .split(
+      /[\n,;+]|\b(?:et\s+(?:un|une|le|la|les|d'|l'|\d+)|et\b|puis\b|ainsi que\b|avec\s+(?:un|une|\d+))\b/i
+    )
     .map((s) => s.trim())
     .filter(Boolean);
 
@@ -149,7 +160,12 @@ export function parseDocumentOfflineText(
     const isNumericMetadata = looksLikeItemMetadata(segment);
     if (isNumericMetadata) {
       const previous = groupedSegments[groupedSegments.length - 1];
-      if (previous && previous && !shouldSkipHeaderLine(previous) && !looksLikeItemMetadata(previous)) {
+      if (
+        previous &&
+        previous &&
+        !shouldSkipHeaderLine(previous) &&
+        !looksLikeItemMetadata(previous)
+      ) {
         groupedSegments[groupedSegments.length - 1] = `${previous}\n${segment}`;
       }
       continue;
@@ -208,7 +224,10 @@ export function parseDocumentOfflineText(
 }
 
 function shouldSkipHeaderLine(line: string): boolean {
-  const normalized = line.replace(/[\u00A0\s]+/g, " ").trim().toLowerCase();
+  const normalized = line
+    .replace(/[\u00A0\s]+/g, " ")
+    .trim()
+    .toLowerCase();
   if (!normalized) return true;
 
   return (
@@ -252,13 +271,18 @@ function looksLikeItemName(line: string): boolean {
 function looksLikeItemMetadata(line: string): boolean {
   const normalized = line.replace(/[\u00A0\s]+/g, " ").trim();
   if (!normalized || shouldSkipHeaderLine(normalized)) return false;
-  return /^(?:\d+(?:[.,]\d+)?(?:\s*(?:x|fois|unités?|unites?|pieces?|pcs?|paquets?|sacs?|cartons?))?|\d{1,3}(?:[\s.\u00A0]\d{3})+(?:\s*(?:fcfa|cfa|f))?|\d+(?:[.,]\d+)?\s*(?:fcfa|cfa|f)?)$/i.test(normalized);
+  return /^(?:\d+(?:[.,]\d+)?(?:\s*(?:x|fois|unités?|unites?|pieces?|pcs?|paquets?|sacs?|cartons?))?|\d{1,3}(?:[\s.\u00A0]\d{3})+(?:\s*(?:fcfa|cfa|f))?|\d+(?:[.,]\d+)?\s*(?:fcfa|cfa|f)?)$/i.test(
+    normalized
+  );
 }
 
 function looksLikeTableRow(line: string): boolean {
   const normalized = line.replace(/[\u00A0\s]+/g, " ").trim();
   if (!normalized) return false;
-  return /^\d+(?:[.,]\d+)?$/.test(normalized) || /^(?:\d{1,3}(?:[\s.\u00A0]\d{3})+|\d+(?:[.,]\d+)?)\s*(?:fcfa|cfa|f)?$/i.test(normalized);
+  return (
+    /^\d+(?:[.,]\d+)?$/.test(normalized) ||
+    /^(?:\d{1,3}(?:[\s.\u00A0]\d{3})+|\d+(?:[.,]\d+)?)\s*(?:fcfa|cfa|f)?$/i.test(normalized)
+  );
 }
 
 function parseCurrencyValue(value: string): number | null {
@@ -270,11 +294,15 @@ function parseCurrencyValue(value: string): number | null {
 
   if (!normalized) return null;
 
-  const match = normalized.match(/(\d{1,3}(?:[\s.\u00A0]\d{3})+|\d+)(?:[.,]\d+)?\s*(?:fcfa|cfa|f)?/i);
+  const match = normalized.match(
+    /(\d{1,3}(?:[\s.\u00A0]\d{3})+|\d+)(?:[.,]\d+)?\s*(?:fcfa|cfa|f)?/i
+  );
   if (!match) return null;
 
   const digits = match[1].replace(/[\s.\u00A0]/g, "");
-  const decimals = normalized.includes(",") ? normalized.split(",")[1]?.replace(/[^\d]/g, "") ?? "" : "";
+  const decimals = normalized.includes(",")
+    ? (normalized.split(",")[1]?.replace(/[^\d]/g, "") ?? "")
+    : "";
   const finalValue = decimals ? Number(`${digits}.${decimals}`) : Number(digits);
   return Number.isFinite(finalValue) && finalValue > 0 ? Math.round(finalValue) : null;
 }
@@ -318,7 +346,10 @@ function parseSingleItemCandidate(
       }
 
       const normalizedName = designationLine
-        .replace(/^(?:fais\s+(?:un|une)\s+)?(?:pour\s+)?(?:achat\s+de|vente\s+de|fourniture\s+de|devis\s+pour|facture\s+pour)\s+/i, "")
+        .replace(
+          /^(?:fais\s+(?:un|une)\s+)?(?:pour\s+)?(?:achat\s+de|vente\s+de|fourniture\s+de|devis\s+pour|facture\s+pour)\s+/i,
+          ""
+        )
         .replace(/^(?:un|une|le|la|les|des|d'|l'|du|de|au|aux)\s+/i, "")
         .trim();
 
@@ -360,14 +391,19 @@ function parseSingleItemCandidate(
 
   // Nettoyer les verbes / préfixes de tête
   clean = clean
-    .replace(/^(?:fais\s+(?:un|une)\s+)?(?:pour\s+)?(?:achat\s+de|achat\s+d'|vente\s+de|fourniture\s+de|pour\s+achat\s+de|pour)\s+/i, "")
+    .replace(
+      /^(?:fais\s+(?:un|une)\s+)?(?:pour\s+)?(?:achat\s+de|achat\s+d'|vente\s+de|fourniture\s+de|pour\s+achat\s+de|pour)\s+/i,
+      ""
+    )
     .replace(/^(?:fais\s+(?:un|une)\s+)?(?:devis\s+pour|facture\s+pour)\s+/i, "")
     .replace(/^[:\-–=•\*\.]\s*/, "")
     .trim();
 
   // 2. Extraction de la quantité
   let quantity = 1;
-  const numQtyMatch = clean.match(/^(\d+)\s*(?:x|\*|unités?|pièces?|pcs?|paquets?|sacs?|cartons?)?\s+/i);
+  const numQtyMatch = clean.match(
+    /^(\d+)\s*(?:x|\*|unités?|pièces?|pcs?|paquets?|sacs?|cartons?)?\s+/i
+  );
   if (numQtyMatch) {
     quantity = parseInt(numQtyMatch[1], 10);
     clean = clean.slice(numQtyMatch[0].length).trim();
@@ -401,10 +437,17 @@ function parseSingleItemCandidate(
 
   // Supprimer les mentions de prix qui peuvent rester au milieu de la désignation
   // Exemple: "caméras solaires à 45000, installation" -> retirer "à 45000"
-  clean = clean.replace(/(?:,|\s)*\s*(?:à|au prix de|@)\s*(\d{1,3}(?:[\s.\u00A0]\d{3})+|\d+k?)(?:\s*(?:fcfa|cfa|f|frs?|francs?))?/ig, "").trim();
+  clean = clean
+    .replace(
+      /(?:,|\s)*\s*(?:à|au prix de|@)\s*(\d{1,3}(?:[\s.\u00A0]\d{3})+|\d+k?)(?:\s*(?:fcfa|cfa|f|frs?|francs?))?/gi,
+      ""
+    )
+    .trim();
 
   // Retirer les mots services collés à la suite (installation, maintenance, livraison, etc.)
-  clean = clean.replace(/[,;\-–]\s*(installation|maintenance|livraison|service|forfait|pose|montage)\b/ig, "").trim();
+  clean = clean
+    .replace(/[,;\-–]\s*(installation|maintenance|livraison|service|forfait|pose|montage)\b/gi, "")
+    .trim();
 
   // 4. Nettoyage de la désignation et retrait des articles définis / indéfinis ("le", "la", "un", "l'", etc.)
   let rawDesignation = clean

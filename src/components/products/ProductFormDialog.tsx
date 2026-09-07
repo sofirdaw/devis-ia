@@ -203,7 +203,7 @@ export function ProductFormDialog({
               required
             />
 
-              <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
               <Button
                 type="button"
                 variant="outline"
@@ -212,7 +212,11 @@ export function ProductFormDialog({
               >
                 Annuler
               </Button>
-              <Button type="submit" isLoading={isPending || isSavingOffline} className="w-full sm:w-auto">
+              <Button
+                type="submit"
+                isLoading={isPending || isSavingOffline}
+                className="w-full sm:w-auto"
+              >
                 {isEditMode ? "Enregistrer" : "Ajouter"}
               </Button>
             </div>

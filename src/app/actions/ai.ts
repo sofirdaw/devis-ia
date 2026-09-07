@@ -15,7 +15,7 @@ import {
   extractDocumentFromImageWithFallback,
 } from "@/lib/ai-provider";
 import { parseDocumentOfflineText } from "@/lib/offline-parser";
-import type { Product } from "@/types";
+import type { Client, Product } from "@/types";
 
 // ── Type de retour de l'extraction IA ─────────────────────────────────────────
 
@@ -69,24 +69,43 @@ function buildCatalogContext(products: Product[]): string {
   return `\n\nCatalogue produits existants de l'entreprise (réutilise EXACTEMENT ces noms et prix si l'utilisateur les mentionne, même approximativement) :\n${catalogList}`;
 }
 
-function looksLikeMalformedAIItem(item: { designation: string; quantity?: number; unit_price?: number }) {
+function looksLikeMalformedAIItem(item: {
+  designation: string;
+  quantity?: number;
+  unit_price?: number;
+}) {
   const designation = (item.designation ?? "").trim();
   if (!designation) return true;
 
-  const hasHeaderNoise = /(articles?|désignation|designation|quantité|quantite|prix unitaire|total ht|total ttc)/i.test(designation);
+  const hasHeaderNoise =
+    /(articles?|désignation|designation|quantité|quantite|prix unitaire|total ht|total ttc)/i.test(
+      designation
+    );
   const hasPriceInName = /\s+à\s+\d{2,}(?:[\s.,]\d{3})*(?:\s*(?:fcfa|cfa|f))?/i.test(designation);
-  const hasCommaThenWord = /,\s*(installation|maintenance|livraison|service|forfait|article|livre)/i.test(designation);
+  const hasCommaThenWord =
+    /,\s*(installation|maintenance|livraison|service|forfait|article|livre)/i.test(designation);
 
   return hasHeaderNoise || hasPriceInName || hasCommaThenWord;
 }
 
 function sanitizeAIItems(
-  items: Array<{ designation: string; quantity: number; unit_price: number; product_id?: string | null }>,
+  items: Array<{
+    designation: string;
+    quantity: number;
+    unit_price: number;
+    product_id?: string | null;
+  }>,
   description: string,
   clients: Array<{ id: string; name: string }>,
   products: Product[]
 ): Array<{ product_id: string | null; designation: string; quantity: number; unit_price: number }> {
-  if (items.length === 0) return items as Array<{ product_id: string | null; designation: string; quantity: number; unit_price: number }>;
+  if (items.length === 0)
+    return items as Array<{
+      product_id: string | null;
+      designation: string;
+      quantity: number;
+      unit_price: number;
+    }>;
 
   const hasMalformed = items.some((item) => looksLikeMalformedAIItem(item));
   if (!hasMalformed) {
@@ -98,7 +117,16 @@ function sanitizeAIItems(
     }));
   }
 
-  const fallback = parseDocumentOfflineText(description, clients as any, products);
+  const parserClients: Client[] = clients.map((client) => ({
+    id: client.id,
+    company_id: "",
+    name: client.name,
+    phone: null,
+    email: null,
+    address: null,
+    created_at: "",
+  }));
+  const fallback = parseDocumentOfflineText(description, parserClients, products);
   if (!fallback.success || !fallback.data) {
     return items.map((item) => ({
       product_id: item.product_id ?? null,

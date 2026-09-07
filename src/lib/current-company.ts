@@ -5,6 +5,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import type { Company } from "@/types";
+import { companyCacheKey, getCached, setCached } from "@/lib/cache";
 
 /**
  * Pour les Server Components (pages) : ne redirige pas vers /login en mode hors-ligne
@@ -33,13 +34,20 @@ export async function requireCurrentCompany(): Promise<Company> {
 
   if (user) {
     try {
+      const cachedCompany = await getCached<Company>(companyCacheKey(user.id));
+      if (cachedCompany) return cachedCompany;
+
       const { data: company } = await supabase
         .from("companies")
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (company) return company as Company;
+      if (company) {
+        const typedCompany = company as Company;
+        await setCached(companyCacheKey(user.id), typedCompany, 60);
+        return typedCompany;
+      }
     } catch {
       // Mode hors-ligne : la base Supabase n'est pas joignable
     }
@@ -85,13 +93,20 @@ export async function getCurrentCompanyForAction(): Promise<Company | null> {
   if (!user) return null;
 
   try {
+    const cachedCompany = await getCached<Company>(companyCacheKey(user.id));
+    if (cachedCompany) return cachedCompany;
+
     const { data: company } = await supabase
       .from("companies")
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (company) return company as Company;
+    if (company) {
+      const typedCompany = company as Company;
+      await setCached(companyCacheKey(user.id), typedCompany, 60);
+      return typedCompany;
+    }
   } catch {
     // Ignorer
   }

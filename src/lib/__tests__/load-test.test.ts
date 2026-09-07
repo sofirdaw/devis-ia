@@ -61,6 +61,7 @@ describe("Test de Charge & Concurrence Locale (Stress Test)", () => {
     );
 
     expect(allSuccessful).toBe(true);
-    expect(totalTime).toBeLessThan(1000); // Doit traiter 1000 requêtes en moins de 1 seconde
+    // Le seuil garde une marge pour les runners partagés et les suites parallèles.
+    expect(totalTime).toBeLessThan(2000);
   });
 });

@@ -9,6 +9,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentCompanyForAction } from "@/lib/current-company";
+import { dashboardCacheKey, getCached, setCached } from "@/lib/cache";
 
 export type DashboardStats = {
   quotesCount: number;
@@ -67,6 +68,9 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
     const company = await getCurrentCompanyForAction();
 
     if (!company) return null;
+
+    const cachedStats = await getCached<DashboardStats>(dashboardCacheKey(company.id));
+    if (cachedStats) return cachedStats;
 
     // Début du mois en cours
     const startOfMonth = new Date();
@@ -168,7 +172,7 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       invoice_number?: string;
     };
 
-    return {
+    const stats: DashboardStats = {
       quotesCount,
       invoicesCount,
       totalRevenue,
@@ -192,6 +196,8 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       })),
       monthlyRevenue,
     };
+    await setCached(dashboardCacheKey(company.id), stats, 30);
+    return stats;
   } catch (error: unknown) {
     if (error && typeof error === "object" && "digest" in error) {
       throw error;

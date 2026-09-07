@@ -31,6 +31,7 @@ import {
   Factory,
   Menu,
   X,
+  CreditCard,
 } from "lucide-react";
 
 // Définition des items de navigation
@@ -79,6 +80,11 @@ const NAV_ITEMS: {
 ];
 
 const BOTTOM_ITEMS = [
+  {
+    label: "Abonnement",
+    href: "/subscription",
+    icon: CreditCard,
+  },
   {
     label: "Paramètres",
     href: "/settings",

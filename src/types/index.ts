@@ -28,6 +28,12 @@ export type Company = {
   iban?: string | null;
   default_quote_notes: string | null; // Notes par défaut pour les devis
   default_invoice_notes: string | null; // Notes par défaut pour les factures
+  subscription_plan?: string | null;
+  subscription_status?: string | null;
+  subscription_started_at?: string | null;
+  subscription_expires_at?: string | null;
+  trial_started_at?: string | null;
+  trial_ends_at?: string | null;
   created_at: string;
 };
 

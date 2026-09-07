@@ -20,6 +20,12 @@ CREATE TABLE IF NOT EXISTS companies (
   invoice_prefix  TEXT NOT NULL DEFAULT 'FAC',
   tax_rate        NUMERIC(5,2) NOT NULL DEFAULT 0,
   password_hash   TEXT,
+  subscription_plan TEXT,
+  subscription_status TEXT,
+  subscription_started_at TIMESTAMPTZ,
+  subscription_expires_at TIMESTAMPTZ,
+  trial_started_at TIMESTAMPTZ,
+  trial_ends_at TIMESTAMPTZ,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT companies_user_id_unique UNIQUE (user_id)
 );

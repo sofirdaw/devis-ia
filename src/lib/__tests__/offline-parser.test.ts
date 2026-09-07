@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from "vitest";
 import { parseDocumentOfflineText } from "../offline-parser";
 import type { Client, Product } from "@/types";
