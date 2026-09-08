@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { registerAction } from "@/app/actions/auth";
+import { getSiteUrl } from "@/lib/site-url";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -18,11 +19,17 @@ export default function RegisterPage() {
       setError("");
 
       const supabase = createClient();
+      const siteUrl = getSiteUrl();
+
+      if (window.location.origin !== siteUrl) {
+        window.location.replace(`${siteUrl}/register`);
+        return;
+      }
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${siteUrl}/auth/callback`,
         },
       });
 

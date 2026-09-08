@@ -61,6 +61,8 @@ Créez un fichier `.env.local` à la racine du projet :
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=votre_url_supabase
 NEXT_PUBLIC_SUPABASE_ANON_KEY=votre_cle_anon_supabase
+# URL canonique utilisée pour les flux OAuth et PKCE
+NEXT_PUBLIC_SITE_URL=https://dev-fac-ia.vercel.app
 
 # Cache Redis (Upstash, Redis Cloud ou Redis managé)
 # Laisser vide en développement désactive le cache sans bloquer l'application.
@@ -176,8 +178,9 @@ npm run lint     # Exécute ESLint
 
 1. Poussez votre code sur GitHub
 2. Importez le projet sur [Vercel](https://vercel.com)
-3. Configurez les variables d'environnement
-4. Déployez
+3. Configurez les variables d'environnement, notamment `NEXT_PUBLIC_SITE_URL` avec le domaine public canonique
+4. Dans Supabase, ajoutez `https://dev-fac-ia.vercel.app/auth/callback` aux Redirect URLs et utilisez la même URL comme Site URL
+5. Déployez
 
 ### Autres plateformes
 

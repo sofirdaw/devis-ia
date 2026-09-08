@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { forgotPasswordAction } from "@/app/actions/auth";
+import { getSiteUrl } from "@/lib/site-url";
 
 export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
@@ -16,8 +17,7 @@ export default function ForgotPasswordPage() {
     setSuccess(false);
 
     const formData = new FormData(e.currentTarget);
-    const origin = window.location.origin;
-    const result = await forgotPasswordAction({}, formData, origin);
+    const result = await forgotPasswordAction({}, formData, getSiteUrl());
 
     setLoading(false);
     if (result?.error) {

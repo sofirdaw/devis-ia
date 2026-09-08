@@ -5,6 +5,7 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginAction } from "@/app/actions/auth";
+import { getSiteUrl } from "@/lib/site-url";
 
 function LoginForm() {
   const router = useRouter();
@@ -22,11 +23,17 @@ function LoginForm() {
       setError("");
 
       const supabase = createClient();
+      const siteUrl = getSiteUrl();
+
+      if (window.location.origin !== siteUrl) {
+        window.location.replace(`${siteUrl}/login`);
+        return;
+      }
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${siteUrl}/auth/callback`,
         },
       });
 
