@@ -160,7 +160,7 @@ function LoginForm() {
         <button
           type="submit"
           disabled={loading || googleLoading}
-          className="w-full py-3 px-4 bg-primary-600 text-white font-medium rounded-lg text-sm hover:bg-primary-700 transition-colors disabled:opacity-50 shadow-sm"
+          className="w-full py-3 px-4 bg-white text-black border border-gray-300 font-medium rounded-lg text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 shadow-sm"
         >
           {loading ? "Connexion en cours..." : "Se connecter"}
         </button>

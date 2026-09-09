@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import { createClient } from "@/lib/supabase/client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -98,6 +98,23 @@ export function Sidebar() {
   const { company, logout } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
   // Déconnexion via Supabase Auth
   const handleLogout = async () => {
     const supabase = createClient();
@@ -129,10 +146,13 @@ export function Sidebar() {
       {/* Mobile menu button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="lg:hidden fixed top-4 right-20 z-50 p-2 bg-gray-900 text-white rounded-lg shadow-lg hover:bg-gray-800 transition-colors"
+           className="lg:hidden fixed top-3 right-1 sm:top-4 sm:right-4 z-50 flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-lg bg-gray-900 text-white shadow-lg transition-colors hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+style={{marginRight: "4rem"}}
         aria-label="Ouvrir le menu"
+        aria-expanded={isOpen}
+        aria-controls="dashboard-sidebar"
       >
-        <Menu size={24} />
+        <Menu size={22} />
       </button>
 
       {/* Overlay pour mobile */}
@@ -145,9 +165,9 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <aside
+        id="dashboard-sidebar"
         className={cn(
-          "fixed left-0 top-0 h-screen bg-gray-900 flex flex-col shrink-0 transition-transform duration-300 ease-in-out",
-          "w-60",
+          "fixed left-0 top-0 h-dvh w-[min(15rem,calc(100vw-1rem))] bg-gray-900 flex flex-col shrink-0 transition-transform duration-300 ease-in-out",
           isOpen ? "translate-x-0 z-40" : "-translate-x-full z-40",
           "lg:translate-x-0 lg:z-20"
         )}

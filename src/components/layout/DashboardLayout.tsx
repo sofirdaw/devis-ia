@@ -82,7 +82,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }, []); // Exécuté une seule fois au montage
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-x-hidden">
+    <div className="flex min-h-dvh bg-gray-50 overflow-x-hidden">
       <Sidebar />
 
       <main className="flex-1 min-w-0 ml-0 lg:ml-60 flex flex-col overflow-x-hidden overflow-y-hidden">

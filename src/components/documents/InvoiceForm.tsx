@@ -255,6 +255,15 @@ export function InvoiceForm({
 
         <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 lg:pt-6 border-t border-gray-100 mt-6 lg:mt-8">
           <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            onClick={() => router.push("/invoices")}
+            className="w-full sm:w-auto px-8 lg:px-10"
+          >
+            Annuler
+          </Button>
+          <Button
             type="submit"
             size="lg"
             disabled={Boolean(dueDateError)}

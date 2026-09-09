@@ -136,11 +136,7 @@ export function SubscriptionPlans({
       if (!response.ok) throw new Error(result.error || "Confirmation impossible.");
       setPaymentStatus("pending");
       setPaymentConfirmed(true);
-      setActivationMessage(
-        result.alreadyConfirmed
-          ? "Votre paiement est déjà envoyé. L'administrateur va le vérifier."
-          : "Paiement confirmé avec succès ! Votre demande a bien été envoyée à l'administrateur."
-      );
+      setActivationMessage("Paiement confirmé avec succès ! Votre demande a bien été envoyée à l'administrateur.");
       return true;
     } catch (confirmationError) {
       setActivationMessage(
@@ -252,79 +248,81 @@ export function SubscriptionPlans({
         >
           {selectedPlanDetails && (
             <div className="space-y-4 text-sm text-gray-700">
-              <p>
-                Forfait sélectionné : <strong>{selectedPlanDetails.label}</strong>
-              </p>
-              <p>
-                Montant à payer :{" "}
-                <strong>{selectedPlanDetails.price.toLocaleString("fr-FR")} FCFA</strong>
-              </p>
-              <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-orange-800">
-                  Code à composer
-                </p>
-                <p className="break-all font-mono text-base font-bold text-gray-950">
-                  {paymentCode}
-                </p>
-              </div>
-              <ol className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <li>
-                  <strong>1.</strong> Composez le code et validez l&apos;opération.
-                </li>
-                <li>
-                  <strong>2.</strong> Saisissez votre code secret Orange Money.
-                </li>
-                <li>
-                  <strong>3.</strong> Conservez le SMS de confirmation.
-                </li>
-                <li>
-                  <strong>4.</strong> Cliquez sur « J&apos;ai payé » pour envoyer la demande de
-                  vérification.
-                </li>
-                <li>
-                  <strong>5.</strong> Après vérification, votre abonnement sera activé
-                  automatiquement.
-                </li>
-              </ol>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setSelectedPlan(null)}>
-                  Fermer
-                </Button>
-                <Button
-                  onClick={() => navigator.clipboard?.writeText(paymentCode)}
-                  leftIcon={<Copy size={16} />}
-                >
-                  Copier le code
-                </Button>
-              </div>
-              <Button
-                className="w-full"
-                onClick={async () => {
-                  if (await confirmPayment()) setSelectedPlan(null);
-                }}
-                disabled={paymentConfirmed || paymentStatus === "paid"}
-              >
-                J&apos;ai payé, valider
-              </Button>
-              {activationMessage && (
+              {paymentConfirmed && paymentStatus === "pending" ? (
                 <div
                   role="status"
                   className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900"
                 >
                   <CircleCheck className="mt-0.5 shrink-0 text-green-600" size={20} />
-                  <p>{activationMessage}</p>
+                  <p>Paiement confirmé avec succès ! Votre demande a bien été envoyée à l&apos;administrateur.</p>
                 </div>
-              )}
-              {requestId && paymentConfirmed && paymentStatus === "pending" && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-                  <p className="font-semibold">Demande envoyée à l&apos;administrateur</p>
-                  <p className="mt-1">
-                    Vous pouvez fermer cette fenêtre. Une notification apparaîtra automatiquement
-                    dès que votre abonnement sera activé.
+              ) : (
+                <>
+                  <p>
+                    Forfait sélectionné : <strong>{selectedPlanDetails.label}</strong>
                   </p>
-                </div>
+                  <p>
+                    Montant à payer :{" "}
+                    <strong>{selectedPlanDetails.price.toLocaleString("fr-FR")} FCFA</strong>
+                  </p>
+                  <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-orange-800">
+                      Code à composer
+                    </p>
+                    <p className="break-all font-mono text-base font-bold text-gray-950">
+                      {paymentCode}
+                    </p>
+                  </div>
+                  <ol className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <li>
+                      <strong>1.</strong> Composez le code et validez l&apos;opération.
+                    </li>
+                    <li>
+                      <strong>2.</strong> Saisissez votre code secret Orange Money.
+                    </li>
+                    <li>
+                      <strong>3.</strong> Conservez le SMS de confirmation.
+                    </li>
+                    <li>
+                      <strong>4.</strong> Cliquez sur « J&apos;ai payé » pour envoyer la demande de
+                      vérification.
+                    </li>
+                    <li>
+                      <strong>5.</strong> Après vérification, votre abonnement sera activé
+                      automatiquement.
+                    </li>
+                  </ol>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setSelectedPlan(null)}>
+                      Fermer
+                    </Button>
+                    <Button
+                      onClick={() => navigator.clipboard?.writeText(paymentCode)}
+                      leftIcon={<Copy size={16} />}
+                    >
+                      Copier le code
+                    </Button>
+                  </div>
+                  <Button
+                    className="w-full"
+                    onClick={async () => {
+                      if (await confirmPayment()) setSelectedPlan(null);
+                    }}
+                    disabled={paymentConfirmed || paymentStatus === "paid"}
+                  >
+                    J&apos;ai payé, valider
+                  </Button>
+                  {activationMessage && (
+                    <div
+                      role="status"
+                      className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900"
+                    >
+                      <p>{activationMessage}</p>
+                    </div>
+                  )}
+                </>
               )}
-              {requestId && paymentStatus === "paid" && (
+              {!paymentConfirmed && requestId && paymentStatus === "paid" && (
                 <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
                   <p className="text-sm text-blue-900">
                     Votre paiement est vérifié. Votre abonnement sera activé automatiquement.

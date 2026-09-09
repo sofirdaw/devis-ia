@@ -38,7 +38,7 @@ export default function HomePage() {
           <Link href="/sign-in" className="group">
             <Button
               size="lg"
-              className="w-full h-24 flex flex-col items-center justify-center gap-2 text-lg bg-white text-gray-900 hover:bg-gray-50 border-2 border-gray-200 shadow-lg hover:shadow-xl transition-all"
+              className="w-full h-24 flex flex-col items-center justify-center gap-2 text-lg bg-white text-black hover:bg-gray-50 border-2 border-gray-200 shadow-lg hover:shadow-xl transition-all"
             >
               <LogIn size={28} />
               Se connecter
