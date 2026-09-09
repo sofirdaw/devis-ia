@@ -90,12 +90,12 @@ export function UserMenu({ className }: UserMenuProps = {}) {
       <button
         id="user-menu-trigger"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-2 rounded-full pl-1 pr-2.5 py-1 bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors group"
+        className="flex items-center gap-1.5 rounded-full pl-0.5 pr-2 py-0.5 bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors group"
         aria-haspopup="true"
         aria-expanded={open}
       >
         {/* Avatar */}
-        <div className="w-8 h-8 rounded-full overflow-hidden bg-primary-600 flex items-center justify-center text-xs font-bold text-white shrink-0 ring-2 ring-primary-200 group-hover:ring-primary-400 transition-all">
+        <div className="w-6 h-8 rounded-full overflow-hidden bg-primary-600 flex items-center justify-center text-[14px] font-bold text-white shrink-0 ring-2 ring-primary-200 group-hover:ring-primary-400 transition-all">
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -109,7 +109,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
         </div>
 
         {/* Nom affiché */}
-        <span className="hidden sm:block text-sm font-semibold text-gray-900 max-w-[140px] truncate">
+        <span className="hidden sm:block text-xs font-semibold text-gray-900 max-w-25 truncate">
           {fullName}
         </span>
 

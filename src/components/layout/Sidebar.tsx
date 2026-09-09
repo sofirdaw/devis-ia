@@ -146,8 +146,8 @@ export function Sidebar() {
       {/* Mobile menu button */}
       <button
         onClick={() => setIsOpen(true)}
-           className="lg:hidden fixed top-3 right-1 sm:top-4 sm:right-4 z-50 flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-lg bg-gray-900 text-white shadow-lg transition-colors hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-style={{marginRight: "4rem"}}
+           className="lg:hidden fixed top-3 right-1 sm:top-4 sm:right-4 z-50 flex h-8 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-lg bg-gray-900 text-white shadow-lg transition-colors hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+style={{marginRight: "6rem", marginTop: "0.5rem"}}
         aria-label="Ouvrir le menu"
         aria-expanded={isOpen}
         aria-controls="dashboard-sidebar"
