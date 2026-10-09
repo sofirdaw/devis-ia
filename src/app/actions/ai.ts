@@ -84,8 +84,12 @@ function looksLikeMalformedAIItem(item: {
   const hasPriceInName = /\s+à\s+\d{2,}(?:[\s.,]\d{3})*(?:\s*(?:fcfa|cfa|f))?/i.test(designation);
   const hasCommaThenWord =
     /,\s*(installation|maintenance|livraison|service|forfait|article|livre)/i.test(designation);
+  const looksLikeWholeInstruction =
+    designation.length > 100 ||
+    /^(?:fais|crée|cree|génère|genere|facture|devis|client)\b/i.test(designation) ||
+    /\b(?:devis|facture)\s+pour\b|\bclient\s*:/i.test(designation);
 
-  return hasHeaderNoise || hasPriceInName || hasCommaThenWord;
+  return hasHeaderNoise || hasPriceInName || hasCommaThenWord || looksLikeWholeInstruction;
 }
 
 function sanitizeAIItems(
@@ -97,57 +101,58 @@ function sanitizeAIItems(
   }>,
   description: string,
   clients: Array<{ id: string; name: string }>,
-  products: Product[]
+  products: Product[],
+  allowTextFallback = true
 ): Array<{ product_id: string | null; designation: string; quantity: number; unit_price: number }> {
-  if (items.length === 0)
-    return items as Array<{
-      product_id: string | null;
-      designation: string;
-      quantity: number;
-      unit_price: number;
-    }>;
-
   const hasMalformed = items.some((item) => looksLikeMalformedAIItem(item));
-  if (!hasMalformed) {
-    return items.map((item) => ({
+  if (hasMalformed) {
+    if (!allowTextFallback) return [];
+    const parserClients: Client[] = clients.map((client) => ({
+      id: client.id,
+      company_id: "",
+      name: client.name,
+      phone: null,
+      email: null,
+      address: null,
+      created_at: "",
+    }));
+    const fallback = parseDocumentOfflineText(description, parserClients, products);
+    if (!fallback.success || !fallback.data) return [];
+
+    return fallback.data.items.map((item) => ({
+      ...item,
       product_id: item.product_id ?? null,
-      designation: item.designation,
-      quantity: item.quantity || 1,
-      unit_price: item.unit_price ?? 0,
     }));
   }
 
-  const parserClients: Client[] = clients.map((client) => ({
-    id: client.id,
-    company_id: "",
-    name: client.name,
-    phone: null,
-    email: null,
-    address: null,
-    created_at: "",
-  }));
-  const fallback = parseDocumentOfflineText(description, parserClients, products);
-  if (!fallback.success || !fallback.data) {
-    return items.map((item) => ({
-      product_id: item.product_id ?? null,
-      designation: item.designation,
-      quantity: item.quantity || 1,
-      unit_price: item.unit_price ?? 0,
-    }));
-  }
+  const normalizedName = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
 
-  return fallback.data.items.map((item) => {
+  const sanitized = items.map((item) => {
+    const designation = item.designation.trim();
     const matchedProduct = products.find(
-      (p) => p.name.toLowerCase() === item.designation.toLowerCase()
+      (product) => normalizedName(product.name) === normalizedName(designation)
     );
+    const parsedUnitPrice = Number(item.unit_price);
+    const unitPrice =
+      Number.isFinite(parsedUnitPrice) && parsedUnitPrice > 0
+        ? parsedUnitPrice
+        : matchedProduct?.price || 0;
+    const parsedQuantity = Number(item.quantity);
 
     return {
-      product_id: matchedProduct?.id ?? null,
-      designation: matchedProduct?.name ?? item.designation,
-      quantity: item.quantity || 1,
-      unit_price: matchedProduct?.price ?? item.unit_price ?? 0,
+      product_id: matchedProduct?.id ?? item.product_id ?? null,
+      designation: matchedProduct?.name ?? designation,
+      quantity: Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1,
+      unit_price: unitPrice,
     };
   });
+
+  return sanitized.every((item) => item.designation && item.unit_price > 0) ? sanitized : [];
 }
 
 // ── Action principale : extraction IA depuis un texte libre ───────────────────
@@ -206,6 +211,13 @@ export async function generateDocumentFromText(description: string): Promise<AIE
     context.clients,
     context.products as Product[]
   );
+  if (!items.length) {
+    return {
+      success: false,
+      error:
+        "Impossible d'extraire un article avec un prix valide. Précisez le nom et le prix, ou vérifiez la photo.",
+    };
+  }
 
   return {
     success: true,
@@ -272,10 +284,18 @@ export async function generateDocumentFromImage(imageBase64: string): Promise<AI
       quantity: item.quantity || 1,
       unit_price: item.unit_price ?? 0,
     })),
-    `Image analysée : ${parsed.client_name ?? ""}`,
+    "",
     context.clients,
-    context.products as Product[]
+    context.products as Product[],
+    false
   );
+  if (!items.length) {
+    return {
+      success: false,
+      error:
+        "Aucun article avec un prix lisible n'a été détecté. Reprenez la photo ou corrigez les informations en mode texte.",
+    };
+  }
 
   return {
     success: true,

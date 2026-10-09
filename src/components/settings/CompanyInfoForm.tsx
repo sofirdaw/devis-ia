@@ -21,6 +21,7 @@ import { updateCompanyAction } from "@/app/actions/company";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Company } from "@/types";
 import { useAuthStore } from "@/store/auth.store";
+import { addToSyncQueue } from "@/lib/offline-db";
 
 interface CompanyInfoFormProps {
   company: Company;
@@ -33,6 +34,7 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
   const [state, formAction, isPending] = useActionState(action, initialState);
   const [dismissed, setDismissed] = useState(false);
   const [localSuccess, setLocalSuccess] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   // Valeurs initiales basées sur le store ou les props serveur
   const initialCompany = useAuthStore.getState().company ?? company;
@@ -68,8 +70,9 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     setDismissed(false);
+    setLocalError(null);
     const current = useAuthStore.getState().company ?? company;
     useAuthStore.getState().setCompany({
       ...current,
@@ -78,11 +81,24 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
 
     if (typeof window !== "undefined" && !navigator.onLine) {
       e.preventDefault();
-      setLocalSuccess(true);
-      setTimeout(() => {
+      try {
+        await addToSyncQueue("UPDATE_COMPANY", {
+          company_id: company.id,
+          section: "general",
+          fields: formData,
+        });
+        setLocalSuccess(true);
+        setTimeout(() => {
+          setLocalSuccess(false);
+          setDismissed(true);
+        }, 3000);
+      } catch (error) {
+        console.error("Échec de l'enregistrement local des paramètres:", error);
         setLocalSuccess(false);
-        setDismissed(true);
-      }, 3000);
+        setLocalError(
+          "Paramètres modifiés localement mais non ajoutés à la file de synchronisation."
+        );
+      }
     }
   };
 
@@ -95,12 +111,12 @@ export function CompanyInfoForm({ company }: CompanyInfoFormProps) {
 
       <form action={formAction} onSubmit={handleSubmit} className="p-4 sm:p-6 lg:p-8 space-y-6">
         <CardBody className="p-0 space-y-4">
-          {state.error && (
+          {(state.error || localError) && (
             <div
               className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm"
               role="alert"
             >
-              {state.error}
+              {state.error || localError}
             </div>
           )}
 

@@ -20,19 +20,22 @@ export function AdminSubscriptionRequests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [approving, setApproving] = useState<string | null>(null);
-  const [activationCodes, setActivationCodes] = useState<Record<string, string>>({});
+  const [activationNotice, setActivationNotice] = useState<string | null>(null);
   const [newRequestNotice, setNewRequestNotice] = useState(false);
-  const knownRequestCount = useRef<number | null>(null);
+  const knownRequestIds = useRef<Set<string> | null>(null);
 
   async function loadRequests() {
     const response = await fetch("/api/admin/subscription-requests", { cache: "no-store" });
     const result = (await response.json()) as { requests?: RequestItem[]; error?: string };
     if (!response.ok) throw new Error(result.error || "Demandes indisponibles.");
     const nextRequests = result.requests || [];
-    if (knownRequestCount.current !== null && nextRequests.length > knownRequestCount.current) {
+    if (
+      knownRequestIds.current !== null &&
+      nextRequests.some((request) => !knownRequestIds.current?.has(request.id))
+    ) {
       setNewRequestNotice(true);
     }
-    knownRequestCount.current = nextRequests.length;
+    knownRequestIds.current = new Set(nextRequests.map((request) => request.id));
     setRequests(nextRequests);
   }
 
@@ -60,10 +63,19 @@ export function AdminSubscriptionRequests() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json()) as {
+        error?: string;
+        alreadyActivated?: boolean;
+        expiresAt?: string | null;
+      };
       if (!response.ok) throw new Error(result.error || "Activation impossible.");
       setRequests((current) => current.filter((item) => item.id !== requestId));
-      setActivationCodes((current) => ({ ...current, [requestId]: "activated" }));
+      const request = requests.find((item) => item.id === requestId);
+      setActivationNotice(
+        result.alreadyActivated
+          ? "Cette demande avait déjà été validée. Aucun nouvel abonnement n’a été ajouté."
+          : `Abonnement de ${PLANS[request?.plan ?? "monthly"].durationLabel} activé.${result.expiresAt ? ` Accès actif jusqu’au ${new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" }).format(new Date(result.expiresAt))}.` : ""}`
+      );
     } catch (approvalError) {
       setError(approvalError instanceof Error ? approvalError.message : "Activation impossible.");
     } finally {
@@ -99,14 +111,11 @@ export function AdminSubscriptionRequests() {
           </button>
         </div>
       )}
-      {Object.keys(activationCodes).map((id) => (
-        <div
-          key={id}
-          className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900"
-        >
-          Abonnement activé. L&apos;utilisateur reçoit automatiquement l&apos;accès à son espace.
+      {activationNotice && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+          {activationNotice}
         </div>
-      ))}
+      )}
       {!requests.length && (
         <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-500">
           Aucune demande en attente.

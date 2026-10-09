@@ -12,10 +12,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionResult } from "./auth";
 import type { PaymentTransactionInsert } from "@/types";
+import { dashboardCacheKey, invalidateCache } from "@/lib/cache";
 
 const PaymentSchema = z.object({
   amount: z.number().positive("Le montant doit être positif"),
   payment_method: z.enum(["cash", "transfer", "check", "card", "other"]),
+  offline_sync_id: z.string().uuid().optional(),
   payment_date: z.string().min(1, "La date de paiement est requise"),
   reference: z.string().optional(),
   notes: z.string().optional(),
@@ -39,6 +41,7 @@ export async function addPaymentAction(
     payment_date: formData.get("payment_date"),
     reference: formData.get("reference"),
     notes: formData.get("notes"),
+    offline_sync_id: String(formData.get("offline_sync_id") ?? "") || undefined,
   });
 
   if (!parsed.success) {
@@ -51,15 +54,39 @@ export async function addPaymentAction(
   const supabase = await createClient();
 
   // Vérifier que la créance appartient à l'entreprise
-  const { data: receivable } = await supabase
+  const { data: receivable, error: paymentReceivableLookupError } = await supabase
     .from("receivables")
     .select("*")
     .eq("id", receivableId)
     .eq("company_id", company.id)
     .single();
 
+  if (paymentReceivableLookupError) {
+    console.error("Erreur de vérification de la créance:", paymentReceivableLookupError.message);
+    return { error: "Impossible de vérifier cette créance." };
+  }
   if (!receivable) {
     return { error: "Créance introuvable" };
+  }
+  if (receivable.status === "cancelled") {
+    return { error: "Cette créance est annulée et ne peut plus recevoir de paiement." };
+  }
+
+  if (parsed.data.offline_sync_id) {
+    const { data: existingPayment, error: lookupError } = await supabase
+      .from("payment_transactions")
+      .select("receivable_id")
+      .eq("offline_sync_id", parsed.data.offline_sync_id)
+      .maybeSingle();
+    if (lookupError) {
+      console.error("Erreur de vérification du paiement hors-ligne:", lookupError.message);
+      return { error: "Impossible de vérifier si ce paiement a déjà été synchronisé." };
+    }
+    if (existingPayment) {
+      return existingPayment.receivable_id === receivableId
+        ? { success: true }
+        : { error: "Cet identifiant de paiement est déjà utilisé." };
+    }
   }
 
   // Vérifier que le paiement ne dépasse pas le reste à payer
@@ -74,17 +101,28 @@ export async function addPaymentAction(
     payment_date: parsed.data.payment_date,
     reference: parsed.data.reference ?? null,
     notes: parsed.data.notes ?? null,
+    ...(parsed.data.offline_sync_id ? { offline_sync_id: parsed.data.offline_sync_id } : {}),
   };
 
   const { error } = await supabase.from("payment_transactions").insert(paymentData);
 
   if (error) {
+    if (error.code === "23505" && parsed.data.offline_sync_id) {
+      const { data: existingPayment } = await supabase
+        .from("payment_transactions")
+        .select("receivable_id")
+        .eq("offline_sync_id", parsed.data.offline_sync_id)
+        .maybeSingle();
+      if (existingPayment?.receivable_id === receivableId) return { success: true };
+    }
     console.error("Supabase error:", error);
     return { error: `Erreur lors de l'ajout du paiement: ${error.message}` };
   }
 
   revalidatePath("/receivables");
   revalidatePath(`/receivables/${receivableId}`);
+  revalidatePath("/dashboard");
+  await invalidateCache(dashboardCacheKey(company.id));
   return { success: true };
 }
 
@@ -100,13 +138,18 @@ export async function deletePaymentAction(formData: FormData): Promise<void> {
   if (!company) throw new Error("Entreprise introuvable");
 
   // Vérifier que le paiement appartient à une créance de l'entreprise
-  const { data: payment } = await supabase
+  const { data: payment, error: lookupError } = await supabase
     .from("payment_transactions")
     .select("*, receivable:receivables(*)")
     .eq("id", paymentId)
-    .single();
+    .maybeSingle();
 
-  if (!payment || payment.receivable?.company_id !== company.id) {
+  if (lookupError) {
+    console.error("Erreur de vérification du paiement à supprimer:", lookupError.message);
+    throw new Error("Impossible de vérifier ce paiement");
+  }
+  if (!payment) return;
+  if (payment.receivable?.company_id !== company.id) {
     throw new Error("Paiement introuvable");
   }
 
@@ -117,6 +160,8 @@ export async function deletePaymentAction(formData: FormData): Promise<void> {
 
   revalidatePath("/receivables");
   revalidatePath(`/receivables/${receivableId}`);
+  revalidatePath("/dashboard");
+  await invalidateCache(dashboardCacheKey(company.id));
 }
 
 // ── UPDATE RECEIVABLE ───────────────────────────────────────────────────────────
@@ -135,15 +180,22 @@ export async function updateReceivableAction(
   const supabase = await createClient();
 
   // Vérifier que la créance appartient à l'entreprise
-  const { data: receivable } = await supabase
+  const { data: receivable, error: updateLookupError } = await supabase
     .from("receivables")
     .select("*")
     .eq("id", receivableId)
     .eq("company_id", company.id)
     .single();
 
+  if (updateLookupError) {
+    console.error("Erreur de vérification de la créance:", updateLookupError.message);
+    return { error: "Impossible de vérifier cette créance." };
+  }
   if (!receivable) {
     return { error: "Créance introuvable" };
+  }
+  if (receivable.status === "cancelled") {
+    return { error: "Une créance annulée ne peut plus être modifiée." };
   }
 
   // Vérifier que le nouveau montant total n'est pas inférieur au montant déjà payé
@@ -170,6 +222,8 @@ export async function updateReceivableAction(
 
   revalidatePath("/receivables");
   revalidatePath(`/receivables/${receivableId}`);
+  revalidatePath("/dashboard");
+  await invalidateCache(dashboardCacheKey(company.id));
   return { success: true };
 }
 
@@ -182,23 +236,32 @@ export async function deleteReceivableAction(receivableId: string): Promise<Acti
   const supabase = await createClient();
 
   // Vérifier que la créance appartient à l'entreprise
-  const { data: receivable } = await supabase
+  const { data: receivable, error: receivableLookupError } = await supabase
     .from("receivables")
     .select("*")
     .eq("id", receivableId)
     .eq("company_id", company.id)
-    .single();
+    .maybeSingle();
 
-  if (!receivable) {
-    return { error: "Créance introuvable" };
+  if (receivableLookupError) {
+    console.error(
+      "Erreur de vérification de la créance à supprimer:",
+      receivableLookupError.message
+    );
+    return { error: "Impossible de vérifier cette créance." };
   }
+  if (!receivable) return { success: true };
 
   // Empêcher la suppression si des paiements existent
-  const { count: paymentCount } = await supabase
+  const { count: paymentCount, error: paymentCountError } = await supabase
     .from("payment_transactions")
     .select("id", { count: "exact", head: true })
     .eq("receivable_id", receivableId);
 
+  if (paymentCountError) {
+    console.error("Erreur de vérification des paiements associés:", paymentCountError.message);
+    return { error: "Impossible de vérifier les paiements associés à cette créance." };
+  }
   if ((paymentCount ?? 0) > 0) {
     return {
       error: "Impossible de supprimer : des paiements sont associés à cette créance",

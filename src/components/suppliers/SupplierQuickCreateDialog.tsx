@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createQuickSupplierAction } from "@/app/actions/suppliers";
 import { saveOfflineSupplier, addToSyncQueue, registerBackgroundSync } from "@/lib/offline-db";
+import { useAuthStore } from "@/store/auth.store";
 
 interface SupplierQuickCreateDialogProps {
   open: boolean;
@@ -30,9 +31,16 @@ export function SupplierQuickCreateDialog({
     setError(null);
     if (typeof window !== "undefined" && !navigator.onLine) {
       // Offline quick create: save locally and queue sync
-      const localId = `off_sup_${Date.now()}`;
+      const localId = crypto.randomUUID();
+      const companyId = useAuthStore.getState().company?.id;
+      if (!companyId) {
+        setLoading(false);
+        setError("Entreprise introuvable. Reconnectez-vous avant de créer un fournisseur.");
+        return;
+      }
       const offlineSupplier = {
         id: localId,
+        company_id: companyId,
         name: name.trim(),
         contact_name: undefined,
         email: email.trim() || undefined,
@@ -45,6 +53,7 @@ export function SupplierQuickCreateDialog({
       try {
         await saveOfflineSupplier(offlineSupplier);
         await addToSyncQueue("CREATE_SUPPLIER", {
+          company_id: companyId,
           name: offlineSupplier.name,
           phone: offlineSupplier.phone || null,
           email: offlineSupplier.email || null,

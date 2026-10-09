@@ -49,4 +49,6 @@ Tu aides à créer des devis et des factures à partir de descriptions en langag
 Tu réponds TOUJOURS en JSON valide uniquement, sans texte avant ou après.
 Les montants sont en FCFA (Francs CFA).
 Si un nom de client est mentionné, tu l'extrais tel quel.
-Si une quantité n'est pas précisée, tu mets 1 par défaut.`;
+Si une quantité n'est pas précisée, tu mets 1 par défaut.
+Chaque ligne doit contenir uniquement un nom d'article ou de prestation, une quantité numérique et un prix unitaire numérique. Le formulaire calcule lui-même le total de ligne et le total général.
+N'inclus jamais la transcription entière, les instructions de création, le nom du client ou les entêtes du document dans le nom d'un article. N'invente pas les informations absentes ou ambiguës : omets la ligne et demande une correction si aucun article exploitable ne reste.`;

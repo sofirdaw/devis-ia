@@ -13,7 +13,7 @@ export async function GET() {
 
     const { data: company } = await supabase
       .from("companies")
-      .select("id")
+      .select("id, subscription_expires_at")
       .eq("user_id", user.id)
       .maybeSingle();
     if (!company) return NextResponse.json({ payment: null });
@@ -28,7 +28,17 @@ export async function GET() {
       .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    return NextResponse.json({ payment });
+    const isExpiredPendingPayment =
+      payment?.status === "pending" &&
+      payment.payment_request_expires_at !== null &&
+      new Date(payment.payment_request_expires_at) <= new Date();
+
+    return NextResponse.json({
+      payment:
+        payment && !isExpiredPendingPayment
+          ? { ...payment, subscription_expires_at: company.subscription_expires_at }
+          : null,
+    });
   } catch (error) {
     console.error("Pending payment lookup failed:", error);
     return NextResponse.json({ error: "Impossible de récupérer la demande." }, { status: 500 });

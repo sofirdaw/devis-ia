@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { calculateTotals } from "@/lib/utils";
+import { dashboardCacheKey, invalidateCache } from "@/lib/cache";
 import type { ActionResult } from "./auth";
 import type { InvoiceStatus } from "@/types";
 
@@ -80,10 +81,52 @@ export async function createInvoiceAction(
   const company = await getCurrentCompany();
   if (!company) return { error: "Entreprise introuvable" };
 
+  const offlineSyncIdValue = formData.get("offline_sync_id");
+  const offlineSyncId =
+    typeof offlineSyncIdValue === "string" &&
+    z.string().uuid().safeParse(offlineSyncIdValue).success
+      ? offlineSyncIdValue
+      : null;
+  if (offlineSyncIdValue && !offlineSyncId)
+    return { error: "Identifiant local de synchronisation invalide." };
+
   // Utiliser les notes par défaut si aucune note n'est fournie
   const notes = parsed.data.notes || company.default_invoice_notes || null;
 
   const supabase = await createClient();
+  const repairExistingItems = async (invoiceId: string) => {
+    const { error: deleteError } = await supabase
+      .from("invoice_items")
+      .delete()
+      .eq("invoice_id", invoiceId);
+    if (deleteError) return false;
+    const itemsToInsert = parsed.data.items.map((item) => ({
+      invoice_id: invoiceId,
+      product_id: item.product_id || null,
+      designation: item.designation,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total: item.quantity * item.unit_price,
+    }));
+    const { error } = await supabase.from("invoice_items").insert(itemsToInsert);
+    return !error;
+  };
+  if (offlineSyncId) {
+    const { data: existing, error: lookupError } = await supabase
+      .from("invoices")
+      .select("id")
+      .eq("id", offlineSyncId)
+      .eq("company_id", company.id)
+      .maybeSingle();
+    if (lookupError) return { error: "Impossible de vérifier la facture déjà synchronisée." };
+    if (existing) {
+      if (!(await repairExistingItems(existing.id))) {
+        return { error: "Impossible de terminer la synchronisation des lignes de la facture." };
+      }
+      revalidatePath("/invoices");
+      if (formData.get("offline_sync_id")) return { success: true };
+    }
+  }
 
   const { subtotal, tax, total } = calculateTotals(
     parsed.data.items,
@@ -100,6 +143,7 @@ export async function createInvoiceAction(
   const { data: invoice, error: invoiceError } = await supabase
     .from("invoices")
     .insert({
+      ...(offlineSyncId ? { id: offlineSyncId } : {}),
       company_id: company.id,
       client_id: parsed.data.client_id,
       invoice_number: invoiceNumber,
@@ -115,6 +159,20 @@ export async function createInvoiceAction(
     .single();
 
   if (invoiceError || !invoice) {
+    if (offlineSyncId && invoiceError?.code === "23505") {
+      const { data: existing } = await supabase
+        .from("invoices")
+        .select("id")
+        .eq("id", offlineSyncId)
+        .eq("company_id", company.id)
+        .maybeSingle();
+      if (existing) {
+        if (!(await repairExistingItems(existing.id))) {
+          return { error: "Impossible de terminer la synchronisation des lignes de la facture." };
+        }
+        return { success: true };
+      }
+    }
     return { error: "Erreur lors de la création de la facture" };
   }
 
@@ -135,6 +193,7 @@ export async function createInvoiceAction(
   }
 
   revalidatePath("/invoices");
+  if (offlineSyncId) return { success: true };
   redirect(`/invoices/${invoice.id}`);
 }
 
@@ -144,11 +203,31 @@ export async function updateInvoiceStatusAction(
   invoiceId: string,
   status: InvoiceStatus
 ): Promise<ActionResult> {
+  const company = await getCurrentCompany();
+  if (!company) return { error: "Entreprise introuvable" };
+
   const supabase = await createClient();
-  const { error } = await supabase.from("invoices").update({ status }).eq("id", invoiceId);
+  const { data: existing, error: lookupError } = await supabase
+    .from("invoices")
+    .select("status")
+    .eq("id", invoiceId)
+    .eq("company_id", company.id)
+    .maybeSingle();
+  if (lookupError || !existing) return { error: "Facture introuvable" };
+  if (existing.status === "cancelled" && status !== "cancelled") {
+    return { error: "Une facture annulée ne peut pas être réactivée." };
+  }
+
+  const { error } = await supabase
+    .from("invoices")
+    .update({ status })
+    .eq("id", invoiceId)
+    .eq("company_id", company.id);
 
   if (error) return { error: "Erreur lors de la mise à jour du statut" };
 
+  await invalidateCache(dashboardCacheKey(company.id));
+  revalidatePath("/dashboard");
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${invoiceId}`);
   return { success: true };
@@ -269,5 +348,6 @@ export async function updateInvoiceAction(
 
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${invoiceId}`);
+  if (formData.get("offline_sync") === "true") return { success: true };
   redirect(`/invoices/${invoiceId}`);
 }

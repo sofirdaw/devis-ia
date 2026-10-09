@@ -56,7 +56,7 @@ export default async function ProductsPage() {
         }
       />
       <div className="page-container">
-        <ProductsTable initialProducts={products} suppliers={suppliers} />
+        <ProductsTable initialProducts={products} suppliers={suppliers} companyId={company.id} />
       </div>
     </>
   );

@@ -4,10 +4,32 @@ import { PLANS, type PlanId } from "@/lib/subscription";
 
 export const runtime = "nodejs";
 
+type ManualPaymentRequest = {
+  request_id: string;
+  request_order_id: string;
+  request_plan: PlanId;
+  request_user_confirmed_at: string | null;
+  reused: boolean;
+};
+
+function isManualPaymentRequest(value: unknown): value is ManualPaymentRequest {
+  if (typeof value !== "object" || value === null) return false;
+  const result = value as Record<string, unknown>;
+  return (
+    typeof result.request_id === "string" &&
+    typeof result.request_order_id === "string" &&
+    typeof result.request_plan === "string" &&
+    Object.hasOwn(PLANS, result.request_plan) &&
+    (typeof result.request_user_confirmed_at === "string" ||
+      result.request_user_confirmed_at === null) &&
+    typeof result.reused === "boolean"
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const { plan } = (await request.json()) as { plan?: string };
-    if (!plan || !(plan in PLANS)) {
+    if (!plan || !Object.hasOwn(PLANS, plan)) {
       return NextResponse.json({ error: "Forfait invalide." }, { status: 400 });
     }
 
@@ -26,21 +48,26 @@ export async function POST(request: Request) {
 
     const orderId = `MANUAL-${crypto.randomUUID()}`;
     const { data: payment, error } = await supabase
-      .from("subscription_payments")
-      .insert({
-        company_id: company.id,
-        plan: plan as PlanId,
-        amount: PLANS[plan as PlanId].price,
-        currency: process.env.ORANGE_MONEY_CURRENCY || "XOF",
-        order_id: orderId,
-        status: "pending",
-        payment_request_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      .rpc("create_or_reuse_manual_subscription_payment", {
+        p_company_id: company.id,
+        p_plan: plan as PlanId,
+        p_amount: PLANS[plan as PlanId].price,
+        p_currency: process.env.ORANGE_MONEY_CURRENCY || "XOF",
+        p_order_id: orderId,
+        p_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       })
-      .select("id, order_id")
       .single();
 
-    if (error || !payment) throw new Error(error?.message || "Demande non créée.");
-    return NextResponse.json({ requestId: payment.id, orderId: payment.order_id });
+    if (error || !isManualPaymentRequest(payment)) {
+      throw new Error(error?.message || "Réponse invalide lors de la création de la demande.");
+    }
+    return NextResponse.json({
+      requestId: payment.request_id,
+      orderId: payment.request_order_id,
+      plan: payment.request_plan,
+      alreadyConfirmed: Boolean(payment.request_user_confirmed_at),
+      reused: payment.reused,
+    });
   } catch (error) {
     console.error("Subscription request failed:", error);
     return NextResponse.json({ error: "Impossible d'enregistrer la demande." }, { status: 500 });

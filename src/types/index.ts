@@ -16,6 +16,7 @@ export type Company = {
   phone: string | null;
   email: string | null;
   address: string | null;
+  service_description?: string | null;
   logo_url: string | null;
   quote_prefix: string; // ex: "DEV"
   invoice_prefix: string; // ex: "FAC"
@@ -28,6 +29,10 @@ export type Company = {
   iban?: string | null;
   default_quote_notes: string | null; // Notes par défaut pour les devis
   default_invoice_notes: string | null; // Notes par défaut pour les factures
+  quote_pdf_template?: "classic" | "modern" | "minimal";
+  invoice_pdf_template?: "classic" | "modern" | "minimal";
+  quote_pdf_use_header?: boolean;
+  invoice_pdf_use_header?: boolean;
   subscription_plan?: string | null;
   subscription_status?: string | null;
   subscription_started_at?: string | null;
@@ -87,7 +92,7 @@ export type SupplierInsert = Omit<Supplier, "id" | "created_at">;
 
 // ─── DEVIS ─────────────────────────────────────────────────────────────────────
 
-export type QuoteStatus = "draft" | "sent" | "accepted" | "refused";
+export type QuoteStatus = "draft" | "sent" | "accepted" | "refused" | "expired" | "cancelled";
 
 export type Quote = {
   id: string;
@@ -123,7 +128,7 @@ export type QuoteItemInsert = Omit<QuoteItem, "id">;
 
 // ─── FACTURES ──────────────────────────────────────────────────────────────────
 
-export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue";
+export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "cancelled";
 
 export type Invoice = {
   id: string;
@@ -163,7 +168,7 @@ export type InvoiceItemInsert = Omit<InvoiceItem, "id">;
 
 // ─── CRÉANCES (RECEIVABLES) ─────────────────────────────────────────────────────
 
-export type ReceivableStatus = "pending" | "partial" | "paid" | "overdue";
+export type ReceivableStatus = "pending" | "partial" | "paid" | "overdue" | "cancelled";
 
 export type Receivable = {
   id: string;
@@ -199,6 +204,7 @@ export type PaymentMethod = "cash" | "transfer" | "check" | "card" | "other";
 export type PaymentTransaction = {
   id: string;
   receivable_id: string;
+  offline_sync_id?: string | null;
   amount: number;
   payment_method: PaymentMethod;
   payment_date: string;

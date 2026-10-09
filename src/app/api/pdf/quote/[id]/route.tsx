@@ -13,6 +13,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
 import { DocumentPDF, type PDFDocumentData } from "@/components/pdf/DocumentPDF";
 import type { Quote } from "@/types";
+import { getPdfCompatibleLogo } from "@/lib/company-logo";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -43,15 +44,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Entreprise introuvable" }, { status: 404 });
   }
 
-  // Générer une URL publique pour le logo si elle existe
-  let logoUrl = company.logo_url;
-  if (logoUrl && logoUrl.startsWith("https://")) {
-    // Si c'est déjà une URL complète, on la garde
-  } else if (logoUrl && !logoUrl.startsWith("data:")) {
-    const {
-      data: { publicUrl },
-    } = await supabase.storage.from("logos").getPublicUrl(logoUrl);
-    logoUrl = publicUrl;
+  let logoUrl: string | null;
+  try {
+    logoUrl = await getPdfCompatibleLogo(supabase, company.logo_url);
+  } catch (logoError) {
+    const message =
+      logoError instanceof Error ? logoError.message : "Erreur de préparation du logo";
+    console.error("Erreur de préparation du logo de devis:", logoError);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 
   const typedQuote = quote as Quote;
@@ -72,6 +72,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     taxRate: company.tax_rate,
     total: typedQuote.total,
     notes: typedQuote.notes,
+    template: company.quote_pdf_template ?? "classic",
+    useHeader: company.quote_pdf_use_header ?? true,
   };
 
   // Générer le buffer PDF

@@ -9,7 +9,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Search, Plus, Pencil, Trash2, Phone, Mail, MapPin, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,29 +18,131 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { deleteClientAction } from "@/app/actions/clients";
 import { formatDate } from "@/lib/utils";
 import type { Client } from "@/types";
+import {
+  addToSyncQueue,
+  deleteOfflineClient,
+  getOfflineClients,
+  getSyncQueue,
+  removeQueuedMutationsForEntity,
+  type OfflineClient,
+} from "@/lib/offline-db";
 
 interface ClientsTableProps {
   initialClients: Client[];
+  companyId: string;
 }
 
-export function ClientsTable({ initialClients }: ClientsTableProps) {
+export function ClientsTable({ initialClients, companyId }: ClientsTableProps) {
   const [search, setSearch] = useState("");
+  const [offlineClients, setOfflineClients] = useState<OfflineClient[]>([]);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>();
   const [deletingClient, setDeletingClient] = useState<Client | undefined>();
 
+  useEffect(() => {
+    let active = true;
+    const loadOffline = async () => {
+      const clients = await getOfflineClients();
+      const queue = await getSyncQueue();
+      if (!active) return;
+      setOfflineClients(clients.filter((client) => client.company_id === companyId));
+      setDeletedIds((current) => {
+        const queuedDeletes = new Set(
+          queue
+            .filter(
+              (item) => item.action === "DELETE_CLIENT" && item.payload.company_id === companyId
+            )
+            .map((item) => String(item.payload.id))
+        );
+        return new Set([...current, ...queuedDeletes]);
+      });
+    };
+    loadOffline();
+    window.addEventListener("pwa-offline-data-changed", loadOffline);
+    window.addEventListener("pwa-sync-complete", loadOffline);
+    return () => {
+      active = false;
+      window.removeEventListener("pwa-offline-data-changed", loadOffline);
+      window.removeEventListener("pwa-sync-complete", loadOffline);
+    };
+  }, [companyId]);
+
+  const combinedClients = useMemo(() => {
+    const serverIds = new Set(initialClients.map((client) => client.id));
+    const localClients: Client[] = offlineClients
+      .filter(
+        (client) =>
+          (!deletedIds.has(client.id) && !serverIds.has(client.id)) ||
+          (!deletedIds.has(client.id) &&
+            (client.sync_status === "pending_create" || client.sync_status === "pending_update"))
+      )
+      .map((client) => ({
+        id: client.id,
+        company_id: companyId,
+        name: client.name,
+        phone: client.phone ?? null,
+        email: client.email ?? null,
+        address: client.address ?? null,
+        created_at: client.created_at,
+      }));
+    const localIds = new Set(localClients.map((client) => client.id));
+    return [
+      ...localClients,
+      ...initialClients.filter((client) => !localIds.has(client.id) && !deletedIds.has(client.id)),
+    ];
+  }, [companyId, deletedIds, initialClients, offlineClients]);
+
+  const handleDeleteClient = async () => {
+    if (!deletingClient) return;
+    setActionError(null);
+    if (navigator.onLine) {
+      const result = await deleteClientAction(deletingClient.id);
+      if (result.error) {
+        setActionError(result.error);
+        return;
+      }
+      setDeletingClient(undefined);
+      return;
+    }
+
+    const queue = await getSyncQueue();
+    const pendingCreate = queue.find(
+      (item) =>
+        item.action === "CREATE_CLIENT" &&
+        (item.payload.local_client as OfflineClient | undefined)?.id === deletingClient.id
+    );
+    try {
+      if (pendingCreate) {
+        await removeQueuedMutationsForEntity(["CREATE_CLIENT", "UPDATE_CLIENT"], deletingClient.id);
+      } else {
+        await addToSyncQueue("DELETE_CLIENT", {
+          company_id: companyId,
+          id: deletingClient.id,
+        });
+      }
+      await deleteOfflineClient(deletingClient.id);
+      setDeletedIds((current) => new Set(current).add(deletingClient.id));
+      setDeletingClient(undefined);
+    } catch (error) {
+      console.error("Erreur de suppression locale du client:", error);
+      setActionError("Impossible de supprimer ce client hors ligne.");
+    }
+  };
+
   // Filtrage local — recherche par nom, téléphone ou email
   const filteredClients = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return initialClients;
+    if (!term) return combinedClients;
 
-    return initialClients.filter(
+    return combinedClients.filter(
       (c) =>
         c.name.toLowerCase().includes(term) ||
         c.phone?.toLowerCase().includes(term) ||
         c.email?.toLowerCase().includes(term)
     );
-  }, [initialClients, search]);
+  }, [combinedClients, search]);
 
   const openCreateForm = () => {
     setEditingClient(undefined);
@@ -64,6 +166,14 @@ export function ClientsTable({ initialClients }: ClientsTableProps) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        {actionError && (
+          <div
+            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            role="alert"
+          >
+            {actionError}
+          </div>
+        )}
         <Button leftIcon={<Plus size={16} />} onClick={openCreateForm} className="w-full sm:w-auto">
           Ajouter un client
         </Button>
@@ -171,7 +281,7 @@ export function ClientsTable({ initialClients }: ClientsTableProps) {
           onOpenChange={(open) => !open && setDeletingClient(undefined)}
           title="Supprimer ce client ?"
           description={`"${deletingClient.name}" sera définitivement supprimé. Cette action est irréversible.`}
-          onConfirm={() => deleteClientAction(deletingClient.id)}
+          onConfirm={handleDeleteClient}
         />
       )}
     </>

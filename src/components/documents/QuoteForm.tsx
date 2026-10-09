@@ -10,7 +10,7 @@
 
 "use client";
 
-import { useState, useActionState, useRef } from "react";
+import { useState, useActionState, useRef, useEffect } from "react";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,16 @@ import { LineItemsEditor, type LineItem } from "./LineItemsEditor";
 import { TotalsSummary } from "./TotalsSummary";
 import { createQuoteAction } from "@/app/actions/quotes";
 import { useRouter } from "next/navigation";
-import { saveOfflineQuote, addToSyncQueue, registerBackgroundSync } from "@/lib/offline-db";
+import {
+  saveOfflineQuote,
+  addToSyncQueue,
+  registerBackgroundSync,
+  getOfflineClients,
+  getOfflineProducts,
+  type OfflineClient,
+  type OfflineProduct,
+} from "@/lib/offline-db";
+import { useAuthStore } from "@/store/auth.store";
 import { OfflineActionNotice } from "@/components/pwa/OfflineActionNotice";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Client, Product } from "@/types";
@@ -58,21 +67,75 @@ export function QuoteForm({
   const [discount, setDiscount] = useState(0);
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(initialClientId);
   const [isSavingOffline, setIsSavingOffline] = useState(false);
+  const [offlineError, setOfflineError] = useState<string | null>(null);
+  const [cachedClients, setCachedClients] = useState<OfflineClient[]>([]);
+  const [cachedProducts, setCachedProducts] = useState<OfflineProduct[]>([]);
   const [state, formAction, isPending] = useActionState(createQuoteAction, initialState);
   const formRef = useRef<HTMLFormElement>(null);
+  const companyId = useAuthStore((store) => store.company?.id);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let active = true;
+    const loadOfflineData = async () => {
+      const [localClients, localProducts] = await Promise.all([
+        getOfflineClients(),
+        getOfflineProducts(),
+      ]);
+      if (!active) return;
+      setCachedClients(localClients.filter((client) => client.company_id === companyId));
+      setCachedProducts(localProducts.filter((product) => product.company_id === companyId));
+    };
+    void loadOfflineData();
+    window.addEventListener("pwa-offline-data-changed", loadOfflineData);
+    window.addEventListener("pwa-offline-snapshot-ready", loadOfflineData);
+    return () => {
+      active = false;
+      window.removeEventListener("pwa-offline-data-changed", loadOfflineData);
+      window.removeEventListener("pwa-offline-snapshot-ready", loadOfflineData);
+    };
+  }, [companyId]);
 
   // Date d'aujourd'hui au format YYYY-MM-DD (utilisée comme valeur par défaut)
   const todayISO = new Date().toISOString().split("T")[0];
 
-  const clientOptions = clients.map((c) => ({ value: c.id, label: c.name }));
-  const selectedClient = clients.find((c) => c.id === selectedClientId);
+  const availableClients = [
+    ...cachedClients
+      .filter((local) => !clients.some((client) => client.id === local.id))
+      .map((local): Client => ({
+        id: local.id,
+        company_id: companyId ?? "",
+        name: local.name,
+        phone: local.phone ?? null,
+        email: local.email ?? null,
+        address: local.address ?? null,
+        created_at: local.created_at,
+      })),
+    ...clients,
+  ];
+  const availableProducts = [
+    ...cachedProducts
+      .filter((local) => !products.some((product) => product.id === local.id))
+      .map((local): Product => ({
+        id: local.id,
+        company_id: companyId ?? "",
+        name: local.name,
+        description: local.description ?? null,
+        supplier_id: local.supplier_id ?? null,
+        price: local.unit_price,
+        created_at: local.created_at,
+      })),
+    ...products,
+  ];
+  const clientOptions = availableClients.map((c) => ({ value: c.id, label: c.name }));
+  const selectedClient = availableClients.find((c) => c.id === selectedClientId);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     if (typeof window !== "undefined" && !navigator.onLine) {
       e.preventDefault();
       setIsSavingOffline(true);
 
-      const localId = `off_${Date.now()}`;
+      const localId = crypto.randomUUID();
       const quoteNum = `DEV-OFF-${Math.floor(100 + Math.random() * 900)}`;
 
       const subtotal = items.reduce(
@@ -81,11 +144,21 @@ export function QuoteForm({
       );
       const tax = (subtotal - discount) * (taxRate / 100);
       const total = subtotal - discount + tax;
+      const companyId = useAuthStore.getState().company?.id;
+      if (!companyId) {
+        setOfflineError("Entreprise introuvable. Reconnectez-vous avant de créer un devis.");
+        setIsSavingOffline(false);
+        return;
+      }
 
       const notesInput = formRef.current?.querySelector('[name="notes"]') as HTMLTextAreaElement;
+      const validUntilInput = formRef.current?.querySelector(
+        '[name="valid_until"]'
+      ) as HTMLInputElement;
 
       const offlineQuote = {
         id: localId,
+        company_id: companyId,
         quote_number: quoteNum,
         client_name: selectedClient?.name || "Client Local",
         client_id: selectedClientId,
@@ -94,6 +167,7 @@ export function QuoteForm({
         subtotal,
         tax,
         discount,
+        valid_until: validUntilInput?.value || undefined,
         notes: notesInput?.value || defaultNotes || "",
         created_at: new Date().toISOString(),
         items: items.map((i) => ({
@@ -105,24 +179,31 @@ export function QuoteForm({
         sync_status: "pending_create" as const,
       };
 
-      await saveOfflineQuote(offlineQuote);
-      await addToSyncQueue("CREATE_QUOTE", {
-        client_id: selectedClientId,
-        discount,
-        notes: offlineQuote.notes,
-        items,
-        local_quote: offlineQuote,
-      });
-
-      // Tenter d'enregistrer le Background Sync si disponible
       try {
-        await registerBackgroundSync();
-      } catch (e) {
-        // ignore
-      }
+        await saveOfflineQuote(offlineQuote);
+        await addToSyncQueue("CREATE_QUOTE", {
+          company_id: companyId,
+          client_id: selectedClientId,
+          discount,
+          valid_until: offlineQuote.valid_until || "",
+          notes: offlineQuote.notes,
+          items,
+          local_quote: offlineQuote,
+        });
 
-      setIsSavingOffline(false);
-      router.push("/quotes");
+        try {
+          await registerBackgroundSync();
+        } catch {
+          // Background Sync is optional; the online event retries the queue.
+        }
+
+        router.push("/quotes");
+      } catch (error) {
+        console.error("Erreur sauvegarde devis hors-ligne:", error);
+        setOfflineError("Impossible d'enregistrer ce devis sur cet appareil.");
+      } finally {
+        setIsSavingOffline(false);
+      }
     }
   };
 
@@ -135,6 +216,14 @@ export function QuoteForm({
           role="alert"
         >
           {state.error}
+        </div>
+      )}
+      {offlineError && (
+        <div
+          className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"
+          role="alert"
+        >
+          {offlineError}
         </div>
       )}
 
@@ -189,7 +278,7 @@ export function QuoteForm({
               <label className="block text-sm font-semibold text-gray-700 mb-3 lg:mb-4">
                 Articles
               </label>
-              <LineItemsEditor items={items} onChange={setItems} products={products} />
+              <LineItemsEditor items={items} onChange={setItems} products={availableProducts} />
             </div>
 
             {/* Notes */}

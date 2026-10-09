@@ -14,8 +14,14 @@ import { createSupplierAction, updateSupplierAction } from "@/app/actions/suppli
 import type { ActionResult } from "@/app/actions/auth";
 import type { Supplier } from "@/types";
 import { OfflineActionNotice } from "@/components/pwa/OfflineActionNotice";
-import { saveOfflineSupplier, addToSyncQueue, registerBackgroundSync } from "@/lib/offline-db";
+import {
+  getOfflineSuppliers,
+  saveOfflineSupplier,
+  addToSyncQueue,
+  registerBackgroundSync,
+} from "@/lib/offline-db";
 import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/auth.store";
 
 interface SupplierFormProps {
   supplier?: Supplier;
@@ -38,21 +44,70 @@ export function SupplierForm({ supplier }: SupplierFormProps) {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     if (typeof window !== "undefined" && !navigator.onLine) {
       e.preventDefault();
-      if (isEditing) {
-        setLocalError("Impossible de modifier un fournisseur hors-ligne.");
-        return;
-      }
-
       setIsSavingOffline(true);
       const fd = new FormData(e.currentTarget as HTMLFormElement);
       const name = String(fd.get("name") ?? "").trim();
       const phone = String(fd.get("phone") ?? "").trim();
       const email = String(fd.get("email") ?? "").trim();
       const address = String(fd.get("address") ?? "").trim();
+      const companyId = useAuthStore.getState().company?.id;
+      if (!companyId) {
+        setIsSavingOffline(false);
+        setLocalError("Entreprise introuvable. Reconnectez-vous avant de modifier le fournisseur.");
+        return;
+      }
 
-      const localId = `off_sup_${Date.now()}`;
+      if (isEditing) {
+        const localSuppliers = await getOfflineSuppliers();
+        const existingSupplier = localSuppliers.find(
+          (record) => record.id === supplier.id && record.company_id === companyId
+        );
+        if (!existingSupplier) {
+          setIsSavingOffline(false);
+          setLocalError(
+            "Les données de ce fournisseur ne sont pas enregistrées sur cet appareil. Reconnectez-vous pour les synchroniser."
+          );
+          return;
+        }
+        const updatedSupplier = {
+          ...existingSupplier,
+          name,
+          email: email || undefined,
+          phone: phone || undefined,
+          address: address || undefined,
+          sync_status:
+            existingSupplier.sync_status === "pending_create" ? "pending_create" : "pending_update",
+        } as const;
+        try {
+          await saveOfflineSupplier(updatedSupplier);
+          await addToSyncQueue("UPDATE_SUPPLIER", {
+            company_id: companyId,
+            id: supplier.id,
+            name,
+            email: email || null,
+            phone: phone || null,
+            address: address || null,
+            local_supplier: updatedSupplier,
+          });
+          try {
+            await registerBackgroundSync();
+          } catch {
+            // Background Sync is optional.
+          }
+          setIsSavingOffline(false);
+          router.push(`/suppliers/${supplier.id}`);
+        } catch (error) {
+          console.error("Erreur de modification hors-ligne du fournisseur:", error);
+          setIsSavingOffline(false);
+          setLocalError("Impossible d'enregistrer les modifications sur cet appareil.");
+        }
+        return;
+      }
+
+      const localId = crypto.randomUUID();
       const offlineSupplier = {
         id: localId,
+        company_id: companyId,
         name,
         contact_name: undefined,
         email: email || undefined,
@@ -65,6 +120,7 @@ export function SupplierForm({ supplier }: SupplierFormProps) {
       try {
         await saveOfflineSupplier(offlineSupplier);
         await addToSyncQueue("CREATE_SUPPLIER", {
+          company_id: companyId,
           name,
           phone: phone || null,
           email: email || null,
@@ -74,11 +130,14 @@ export function SupplierForm({ supplier }: SupplierFormProps) {
 
         try {
           await registerBackgroundSync();
-        } catch (err) {
+        } catch {
           // ignore
         }
       } catch (err) {
         console.error("Erreur enregistrant fournisseur hors-ligne:", err);
+        setLocalError("Impossible d'enregistrer ce fournisseur sur cet appareil.");
+        setIsSavingOffline(false);
+        return;
       }
 
       setIsSavingOffline(false);

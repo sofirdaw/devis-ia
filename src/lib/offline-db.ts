@@ -3,19 +3,42 @@
  * Permet de lire, créer, modifier et synchroniser des devis et factures sans réseau.
  */
 
+import type {
+  Client,
+  Invoice,
+  PaymentTransaction,
+  Product,
+  Quote,
+  Receivable,
+  Supplier,
+} from "@/types";
+
 const DB_NAME = "DevisIA_OfflineDB";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
+
+export interface OfflineSnapshot {
+  company_id: string;
+  fetched_at: string;
+  clients: Client[];
+  products: Product[];
+  suppliers: Supplier[];
+  quotes: Array<Quote & { quote_items?: NonNullable<Quote["quote_items"]> }>;
+  invoices: Array<Invoice & { invoice_items?: NonNullable<Invoice["invoice_items"]> }>;
+  receivables: Array<Receivable & { payment_transactions?: PaymentTransaction[] }>;
+}
 
 export interface OfflineQuote {
   id: string;
+  company_id?: string;
   quote_number: string;
   client_name?: string;
   client_id?: string;
-  status: "draft" | "sent" | "accepted" | "rejected" | "expired";
+  status: "draft" | "sent" | "accepted" | "rejected" | "refused" | "expired" | "cancelled";
   total: number;
   subtotal: number;
   tax: number;
   discount: number;
+  valid_until?: string;
   notes?: string;
   created_at: string;
   items: Array<{
@@ -29,6 +52,7 @@ export interface OfflineQuote {
 
 export interface OfflineInvoice {
   id: string;
+  company_id?: string;
   invoice_number: string;
   client_name?: string;
   client_id?: string;
@@ -51,7 +75,9 @@ export interface OfflineInvoice {
 
 export interface OfflineProduct {
   id: string;
+  company_id?: string;
   name: string;
+  supplier_id?: string | null;
   description?: string;
   unit_price: number;
   cost_price?: number;
@@ -63,6 +89,7 @@ export interface OfflineProduct {
 
 export interface OfflineSupplier {
   id: string;
+  company_id?: string;
   name: string;
   contact_name?: string;
   email?: string;
@@ -74,6 +101,7 @@ export interface OfflineSupplier {
 
 export interface OfflineClient {
   id: string;
+  company_id?: string;
   name: string;
   phone?: string;
   email?: string;
@@ -92,10 +120,22 @@ export interface SyncQueueItem {
     | "UPDATE_INVOICE"
     | "DELETE_INVOICE"
     | "CREATE_CLIENT"
+    | "UPDATE_CLIENT"
+    | "DELETE_CLIENT"
     | "CREATE_PRODUCT"
     | "UPDATE_PRODUCT"
     | "DELETE_PRODUCT"
-    | "CREATE_SUPPLIER";
+    | "CREATE_SUPPLIER"
+    | "UPDATE_SUPPLIER"
+    | "DELETE_SUPPLIER"
+    | "UPDATE_QUOTE_STATUS"
+    | "UPDATE_INVOICE_STATUS"
+    | "ADD_PAYMENT"
+    | "UPDATE_RECEIVABLE"
+    | "DELETE_RECEIVABLE"
+    | "DELETE_PAYMENT"
+    | "UPDATE_COMPANY"
+    | "UPDATE_COMPANY_LOGO";
   payload: Record<string, unknown>;
   created_at: string;
 }
@@ -138,6 +178,9 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains("sync_queue")) {
         db.createObjectStore("sync_queue", { keyPath: "id" });
       }
+      if (!db.objectStoreNames.contains("snapshots")) {
+        db.createObjectStore("snapshots", { keyPath: "company_id" });
+      }
     };
 
     request.onsuccess = () => resolve(request.result);
@@ -145,6 +188,33 @@ function openDB(): Promise<IDBDatabase> {
     request.onblocked = () => {
       console.warn("Ouverture IndexedDB bloquée par une ancienne connexion");
     };
+  });
+}
+
+function notifyOfflineDataChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("pwa-offline-data-changed"));
+  }
+}
+
+export async function getOfflineSnapshot(companyId: string): Promise<OfflineSnapshot | null> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction("snapshots", "readonly").objectStore("snapshots").get(companyId);
+    request.onsuccess = () => resolve((request.result as OfflineSnapshot | undefined) ?? null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function saveOfflineSnapshot(snapshot: OfflineSnapshot): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction("snapshots", "readwrite").objectStore("snapshots").put(snapshot);
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
   });
 }
 
@@ -174,7 +244,10 @@ export async function saveOfflineQuote(quote: OfflineQuote): Promise<void> {
     const store = transaction.objectStore("quotes");
     const request = store.put(quote);
 
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -186,7 +259,10 @@ export async function deleteOfflineQuote(id: string): Promise<void> {
     const store = transaction.objectStore("quotes");
     const request = store.delete(id);
 
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -217,7 +293,10 @@ export async function saveOfflineInvoice(invoice: OfflineInvoice): Promise<void>
     const store = transaction.objectStore("invoices");
     const request = store.put(invoice);
 
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -229,7 +308,10 @@ export async function deleteOfflineInvoice(id: string): Promise<void> {
     const store = transaction.objectStore("invoices");
     const request = store.delete(id);
 
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -260,7 +342,10 @@ export async function saveOfflineProduct(product: OfflineProduct): Promise<void>
     const store = transaction.objectStore("products");
     const request = store.put(product);
 
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -272,7 +357,10 @@ export async function deleteOfflineProduct(id: string): Promise<void> {
     const store = transaction.objectStore("products");
     const request = store.delete(id);
 
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -303,7 +391,10 @@ export async function saveOfflineClient(client: OfflineClient): Promise<void> {
     const store = transaction.objectStore("clients");
     const request = store.put(client);
 
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -315,7 +406,10 @@ export async function deleteOfflineClient(id: string): Promise<void> {
     const store = transaction.objectStore("clients");
     const request = store.delete(id);
 
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -346,7 +440,10 @@ export async function saveOfflineSupplier(supplier: OfflineSupplier): Promise<vo
     const store = transaction.objectStore("suppliers");
     const request = store.put(supplier);
 
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -358,7 +455,10 @@ export async function deleteOfflineSupplier(id: string): Promise<void> {
     const store = transaction.objectStore("suppliers");
     const request = store.delete(id);
 
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -420,13 +520,32 @@ export async function getSyncQueue(): Promise<SyncQueueItem[]> {
       const store = transaction.objectStore("sync_queue");
       const request = store.getAll();
 
-      request.onsuccess = () => resolve(request.result || []);
+      request.onsuccess = () =>
+        resolve((request.result || []).sort((a, b) => a.created_at.localeCompare(b.created_at)));
       request.onerror = () => reject(request.error);
     });
   } catch (err) {
     console.error("Erreur lecture sync_queue IndexedDB:", err);
     return [];
   }
+}
+
+export async function removeQueuedMutationsForEntity(
+  actions: SyncQueueItem["action"][],
+  entityId: string
+): Promise<number> {
+  const queue = await getSyncQueue();
+  const nestedIds = (payload: Record<string, unknown>) =>
+    ["local_client", "local_product", "local_supplier", "local_quote", "local_invoice"]
+      .map((key) => (payload[key] as { id?: string } | undefined)?.id)
+      .filter((id): id is string => Boolean(id));
+  const matches = queue.filter(
+    (item) =>
+      actions.includes(item.action) &&
+      (item.payload.id === entityId || nestedIds(item.payload).includes(entityId))
+  );
+  await Promise.all(matches.map((item) => removeFromSyncQueue(item.id)));
+  return matches.length;
 }
 
 export async function removeFromSyncQueue(id: string): Promise<void> {

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useActionState, useRef } from "react";
+import { useState, useActionState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +14,16 @@ import { Button } from "@/components/ui/button";
 import { LineItemsEditor, type LineItem } from "./LineItemsEditor";
 import { TotalsSummary } from "./TotalsSummary";
 import { createInvoiceAction } from "@/app/actions/invoices";
-import { saveOfflineInvoice, addToSyncQueue, registerBackgroundSync } from "@/lib/offline-db";
+import {
+  saveOfflineInvoice,
+  addToSyncQueue,
+  registerBackgroundSync,
+  getOfflineClients,
+  getOfflineProducts,
+  type OfflineClient,
+  type OfflineProduct,
+} from "@/lib/offline-db";
+import { useAuthStore } from "@/store/auth.store";
 import { OfflineActionNotice } from "@/components/pwa/OfflineActionNotice";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Client, Product } from "@/types";
@@ -52,15 +61,69 @@ export function InvoiceForm({
   const [discount, setDiscount] = useState(0);
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(initialClientId);
   const [isSavingOffline, setIsSavingOffline] = useState(false);
+  const [offlineError, setOfflineError] = useState<string | null>(null);
+  const [cachedClients, setCachedClients] = useState<OfflineClient[]>([]);
+  const [cachedProducts, setCachedProducts] = useState<OfflineProduct[]>([]);
   const [dueDateError, setDueDateError] = useState<string | null>(null);
   const [state, formAction, isPending] = useActionState(createInvoiceAction, initialState);
   const formRef = useRef<HTMLFormElement>(null);
+  const companyId = useAuthStore((store) => store.company?.id);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let active = true;
+    const loadOfflineData = async () => {
+      const [localClients, localProducts] = await Promise.all([
+        getOfflineClients(),
+        getOfflineProducts(),
+      ]);
+      if (!active) return;
+      setCachedClients(localClients.filter((client) => client.company_id === companyId));
+      setCachedProducts(localProducts.filter((product) => product.company_id === companyId));
+    };
+    void loadOfflineData();
+    window.addEventListener("pwa-offline-data-changed", loadOfflineData);
+    window.addEventListener("pwa-offline-snapshot-ready", loadOfflineData);
+    return () => {
+      active = false;
+      window.removeEventListener("pwa-offline-data-changed", loadOfflineData);
+      window.removeEventListener("pwa-offline-snapshot-ready", loadOfflineData);
+    };
+  }, [companyId]);
 
   // Date d'aujourd'hui au format YYYY-MM-DD (valeur minimale pour l'échéance)
   const todayISO = new Date().toISOString().split("T")[0];
 
-  const clientOptions = clients.map((c) => ({ value: c.id, label: c.name }));
-  const selectedClient = clients.find((c) => c.id === selectedClientId);
+  const availableClients = [
+    ...cachedClients
+      .filter((local) => !clients.some((client) => client.id === local.id))
+      .map((local): Client => ({
+        id: local.id,
+        company_id: companyId ?? "",
+        name: local.name,
+        phone: local.phone ?? null,
+        email: local.email ?? null,
+        address: local.address ?? null,
+        created_at: local.created_at,
+      })),
+    ...clients,
+  ];
+  const availableProducts = [
+    ...cachedProducts
+      .filter((local) => !products.some((product) => product.id === local.id))
+      .map((local): Product => ({
+        id: local.id,
+        company_id: companyId ?? "",
+        name: local.name,
+        description: local.description ?? null,
+        supplier_id: local.supplier_id ?? null,
+        price: local.unit_price,
+        created_at: local.created_at,
+      })),
+    ...products,
+  ];
+  const clientOptions = availableClients.map((c) => ({ value: c.id, label: c.name }));
+  const selectedClient = availableClients.find((c) => c.id === selectedClientId);
 
   // Validation de la date d'échéance en temps réel
   const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,7 +151,7 @@ export function InvoiceForm({
       e.preventDefault();
       setIsSavingOffline(true);
 
-      const localId = `off_fac_${Date.now()}`;
+      const localId = crypto.randomUUID();
       const invoiceNum = `FAC-OFF-${Math.floor(100 + Math.random() * 900)}`;
 
       const subtotal = items.reduce(
@@ -97,11 +160,18 @@ export function InvoiceForm({
       );
       const tax = (subtotal - discount) * (taxRate / 100);
       const total = subtotal - discount + tax;
+      const companyId = useAuthStore.getState().company?.id;
+      if (!companyId) {
+        setOfflineError("Entreprise introuvable. Reconnectez-vous avant de créer une facture.");
+        setIsSavingOffline(false);
+        return;
+      }
 
       const notesInput = formRef.current?.querySelector('[name="notes"]') as HTMLTextAreaElement;
 
       const offlineInvoice = {
         id: localId,
+        company_id: companyId,
         invoice_number: invoiceNum,
         client_name: selectedClient?.name || "Client Local",
         client_id: selectedClientId,
@@ -125,6 +195,7 @@ export function InvoiceForm({
       try {
         await saveOfflineInvoice(offlineInvoice);
         await addToSyncQueue("CREATE_INVOICE", {
+          company_id: companyId,
           client_id: selectedClientId,
           discount,
           due_date: dueDateInput?.value || initialDate || "",
@@ -141,13 +212,14 @@ export function InvoiceForm({
         // Tenter d'enregistrer le Background Sync si disponible
         try {
           await registerBackgroundSync();
-        } catch (e) {
+        } catch {
           // ignore
         }
 
         router.push("/invoices");
       } catch (err) {
         console.error("Erreur sauvegarde facture hors-ligne:", err);
+        setOfflineError("Impossible d'enregistrer cette facture sur cet appareil.");
       } finally {
         setIsSavingOffline(false);
       }
@@ -163,6 +235,14 @@ export function InvoiceForm({
           role="alert"
         >
           {state.error}
+        </div>
+      )}
+      {offlineError && (
+        <div
+          className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"
+          role="alert"
+        >
+          {offlineError}
         </div>
       )}
 
@@ -216,7 +296,7 @@ export function InvoiceForm({
               <label className="block text-sm font-semibold text-gray-700 mb-3 lg:mb-4">
                 Articles
               </label>
-              <LineItemsEditor items={items} onChange={setItems} products={products} />
+              <LineItemsEditor items={items} onChange={setItems} products={availableProducts} />
             </div>
 
             {/* Notes */}

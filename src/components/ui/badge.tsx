@@ -14,7 +14,17 @@
 
 import { cn } from "@/lib/utils";
 
-type BadgeVariant = "draft" | "sent" | "accepted" | "refused" | "paid" | "overdue" | "default";
+type BadgeVariant =
+  | "draft"
+  | "sent"
+  | "accepted"
+  | "refused"
+  | "paid"
+  | "overdue"
+  | "expired"
+  | "partial"
+  | "cancelled"
+  | "default";
 
 interface BadgeProps {
   variant?: BadgeVariant;
@@ -30,6 +40,9 @@ const VARIANTS: Record<BadgeVariant, string> = {
   refused: "bg-red-100 text-red-700",
   paid: "bg-green-100 text-green-700",
   overdue: "bg-orange-100 text-orange-700",
+  expired: "bg-amber-100 text-amber-700",
+  partial: "bg-amber-100 text-amber-800",
+  cancelled: "bg-red-100 text-red-700",
 };
 
 // Labels français pour chaque statut
@@ -40,6 +53,9 @@ export const STATUS_LABELS: Record<string, string> = {
   refused: "Refusé",
   paid: "Payé",
   overdue: "En retard",
+  expired: "Expiré",
+  partial: "Partiellement payé",
+  cancelled: "Annulé",
 };
 
 export function Badge({ variant = "default", children, className }: BadgeProps) {

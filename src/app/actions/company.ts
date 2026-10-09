@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { ActionResult } from "./auth";
 import { companyCacheKey, dashboardCacheKey, invalidateCache } from "@/lib/cache";
+import { convertLogoToJpeg } from "@/lib/company-logo";
 
 const CompanySchema = z.object({
   name: z.string().min(2, "Le nom de l'entreprise est requis"),
@@ -24,6 +25,7 @@ const CompanySchema = z.object({
   cme: z.string().optional(),
   default_quote_notes: z.string().optional(),
   default_invoice_notes: z.string().optional(),
+  use_pdf_header: z.enum(["on", "off"]).optional(),
 });
 
 /**
@@ -44,6 +46,7 @@ export async function createCompanyAction(
     cme: formData.get("cme") || undefined,
     default_quote_notes: formData.get("default_quote_notes") || undefined,
     default_invoice_notes: formData.get("default_invoice_notes") || undefined,
+    use_pdf_header: formData.get("use_pdf_header") === "on" ? "on" : "off",
   });
 
   if (!parsed.success) {
@@ -86,6 +89,10 @@ export async function createCompanyAction(
       cme: parsed.data.cme || null,
       default_quote_notes: parsed.data.default_quote_notes || null,
       default_invoice_notes: parsed.data.default_invoice_notes || null,
+      quote_pdf_template: "classic",
+      invoice_pdf_template: "classic",
+      quote_pdf_use_header: parsed.data.use_pdf_header === "on",
+      invoice_pdf_use_header: parsed.data.use_pdf_header === "on",
       subscription_status: "trial",
       trial_started_at: new Date().toISOString(),
       trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -111,12 +118,12 @@ export async function createCompanyAction(
       return { error: "L'image doit faire moins de 2 Mo" };
     }
 
-    const extension = logoFile.name.split(".").pop();
-    const path = `${company.id}/logo.${extension}`;
+    const jpegLogo = await convertLogoToJpeg(logoFile);
+    const path = `${company.id}/logo.jpg`;
 
     const { error: uploadError } = await supabase.storage
       .from("logos")
-      .upload(path, logoFile, { upsert: true });
+      .upload(path, jpegLogo, { upsert: true, contentType: "image/jpeg" });
 
     if (uploadError) {
       console.error("Erreur upload logo:", uploadError);
@@ -128,12 +135,14 @@ export async function createCompanyAction(
     const logoUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
     // Mettre à jour l'entreprise avec l'URL du logo
-    const { error: updateError } = await supabase
+    const { data: updatedCompany, error: updateError } = await supabase
       .from("companies")
       .update({ logo_url: logoUrl })
-      .eq("id", company.id);
+      .eq("id", company.id)
+      .select("id")
+      .maybeSingle();
 
-    if (updateError) {
+    if (updateError || !updatedCompany) {
       console.error("Erreur update logo_url:", updateError);
       return { error: "Erreur lors de l'enregistrement du logo" };
     }
@@ -243,12 +252,22 @@ export async function updateCompanyPreferencesAction(
     quote_prefix: z.string().min(1, "Préfixe requis").max(10),
     invoice_prefix: z.string().min(1, "Préfixe requis").max(10),
     tax_rate: z.coerce.number().min(0).max(100),
+    quote_pdf_template: z.enum(["classic", "modern", "minimal"]),
+    invoice_pdf_template: z.enum(["classic", "modern", "minimal"]),
+    quote_pdf_use_header: z.enum(["on", "off"]),
+    invoice_pdf_use_header: z.enum(["on", "off"]),
+    service_description: z.string().max(140, "La description ne peut pas dépasser 140 caractères"),
   });
 
   const parsed = PreferencesSchema.safeParse({
     quote_prefix: formData.get("quote_prefix"),
     invoice_prefix: formData.get("invoice_prefix"),
     tax_rate: formData.get("tax_rate"),
+    quote_pdf_template: formData.get("quote_pdf_template") || "classic",
+    invoice_pdf_template: formData.get("invoice_pdf_template") || "classic",
+    quote_pdf_use_header: formData.get("quote_pdf_use_header") === "on" ? "on" : "off",
+    invoice_pdf_use_header: formData.get("invoice_pdf_use_header") === "on" ? "on" : "off",
+    service_description: formData.get("service_description") || "",
   });
 
   if (!parsed.success) {
@@ -294,6 +313,11 @@ export async function updateCompanyPreferencesAction(
       quote_prefix: parsed.data.quote_prefix.toUpperCase(),
       invoice_prefix: parsed.data.invoice_prefix.toUpperCase(),
       tax_rate: parsed.data.tax_rate,
+      quote_pdf_template: parsed.data.quote_pdf_template,
+      invoice_pdf_template: parsed.data.invoice_pdf_template,
+      quote_pdf_use_header: parsed.data.quote_pdf_use_header === "on",
+      invoice_pdf_use_header: parsed.data.invoice_pdf_use_header === "on",
+      service_description: parsed.data.service_description.trim() || null,
     })
     .eq("id", targetCompanyId);
 
@@ -328,12 +352,12 @@ export async function uploadCompanyLogoAction(
 
   // Chemin unique : un dossier par entreprise, nom de fichier fixe "logo"
   // pour que le upsert remplace l'ancien logo automatiquement.
-  const extension = file.name.split(".").pop();
-  const path = `${companyId}/logo.${extension}`;
+  const jpegLogo = await convertLogoToJpeg(file);
+  const path = `${companyId}/logo.jpg`;
 
   const { error: uploadError } = await supabase.storage
     .from("logos")
-    .upload(path, file, { upsert: true });
+    .upload(path, jpegLogo, { upsert: true, contentType: "image/jpeg" });
 
   if (uploadError) {
     console.error("Erreur upload logo:", uploadError);
@@ -346,13 +370,20 @@ export async function uploadCompanyLogoAction(
   // Ajouter un timestamp pour forcer le rafraîchissement du cache navigateur
   const logoUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
-  const { error: updateError } = await supabase
+  const { data: updatedCompany, error: updateError } = await supabase
     .from("companies")
     .update({ logo_url: logoUrl })
-    .eq("id", companyId);
+    .eq("id", companyId)
+    .select("id")
+    .maybeSingle();
 
-  if (updateError) {
-    return { error: "Erreur lors de l'enregistrement du logo" };
+  if (updateError || !updatedCompany) {
+    console.error("Erreur update logo_url:", updateError);
+    return {
+      error: updateError
+        ? `Erreur lors de l'enregistrement du logo: ${updateError.message}`
+        : "Entreprise introuvable pour enregistrer le logo",
+    };
   }
 
   revalidatePath("/settings");

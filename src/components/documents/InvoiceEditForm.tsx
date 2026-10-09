@@ -16,6 +16,9 @@ import { TotalsSummary } from "./TotalsSummary";
 import { updateInvoiceAction } from "@/app/actions/invoices";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Client, Product, Invoice } from "@/types";
+import { addToSyncQueue, registerBackgroundSync, saveOfflineInvoice } from "@/lib/offline-db";
+import { useAuthStore } from "@/store/auth.store";
+import { OfflineActionNotice } from "@/components/pwa/OfflineActionNotice";
 
 interface InvoiceEditFormProps {
   invoice: Invoice;
@@ -38,9 +41,81 @@ export function InvoiceEditForm({ invoice, clients, products, taxRate }: Invoice
   );
   const [discount, setDiscount] = useState(invoice.discount);
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(invoice.client_id);
+  const [isSavingOffline, setIsSavingOffline] = useState(false);
+  const [offlineError, setOfflineError] = useState<string | null>(null);
 
   const action = updateInvoiceAction.bind(null, invoice.id);
   const [state, formAction, isPending] = useActionState(action, initialState);
+  const companyId = useAuthStore((store) => store.company?.id);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    if (navigator.onLine) return;
+    event.preventDefault();
+    if (!companyId || invoice.company_id !== companyId) {
+      setOfflineError("Entreprise indisponible hors ligne. Reconnectez-vous puis réessayez.");
+      return;
+    }
+
+    setIsSavingOffline(true);
+    setOfflineError(null);
+    const formData = new FormData(event.currentTarget);
+    const discountValue = Number(formData.get("discount") ?? 0);
+    const notes = String(formData.get("notes") ?? "");
+    const dueDate = String(formData.get("due_date") ?? "");
+    const subtotal = items.reduce(
+      (sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0),
+      0
+    );
+    const tax = (subtotal - discountValue) * (taxRate / 100);
+    const localInvoice = {
+      id: invoice.id,
+      company_id: companyId,
+      invoice_number: invoice.invoice_number,
+      client_name: clients.find((client) => client.id === selectedClientId)?.name,
+      client_id: selectedClientId,
+      status: invoice.status,
+      subtotal,
+      tax,
+      discount: discountValue,
+      total: subtotal - discountValue + tax,
+      notes,
+      due_date: dueDate,
+      created_at: invoice.created_at,
+      items: items.map((item) => ({
+        designation: item.designation,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total: item.quantity * item.unit_price,
+      })),
+      sync_status: "pending_update" as const,
+    };
+    const payload = {
+      company_id: companyId,
+      id: invoice.id,
+      client_id: selectedClientId,
+      discount: discountValue,
+      notes,
+      due_date: dueDate,
+      items,
+      local_invoice: localInvoice,
+    };
+
+    try {
+      await saveOfflineInvoice(localInvoice);
+      await addToSyncQueue("UPDATE_INVOICE", payload);
+      try {
+        await registerBackgroundSync();
+      } catch {
+        // Online-event synchronization remains available when Background Sync is unsupported.
+      }
+      router.push("/invoices");
+    } catch (error) {
+      console.error("Erreur de sauvegarde hors-ligne de la facture:", error);
+      setOfflineError("Impossible d'enregistrer les modifications sur cet appareil.");
+    } finally {
+      setIsSavingOffline(false);
+    }
+  };
 
   // ✅ Dès que la mise à jour est réussie, naviguer vers la facture pour que le PDF soit à jour
   useEffect(() => {
@@ -54,7 +129,16 @@ export function InvoiceEditForm({ invoice, clients, products, taxRate }: Invoice
   const selectedClient = clients.find((c) => c.id === selectedClientId);
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} onSubmit={handleSubmit} className="space-y-6">
+      <OfflineActionNotice />
+      {offlineError && (
+        <div
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          role="alert"
+        >
+          {offlineError}
+        </div>
+      )}
       {state.error && (
         <div
           className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"
@@ -153,7 +237,7 @@ export function InvoiceEditForm({ invoice, clients, products, taxRate }: Invoice
           <Button
             type="submit"
             size="lg"
-            isLoading={isPending}
+            isLoading={isPending || isSavingOffline}
             className="w-full sm:w-auto px-8 lg:px-10 shadow-lg"
           >
             {isPending ? "Enregistrement..." : "Enregistrer les modifications"}

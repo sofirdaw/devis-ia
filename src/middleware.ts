@@ -17,6 +17,32 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // ── Intercepter le callback OAuth Supabase arrivant sur n'importe quelle URL ──
+  const code = request.nextUrl.searchParams.get("code");
+  if (code && pathname !== "/auth/callback") {
+    const callbackUrl = request.nextUrl.clone();
+    callbackUrl.pathname = "/auth/callback";
+    return NextResponse.redirect(callbackUrl);
+  }
+
+  const restrictedPaths = [
+    "/quotes",
+    "/clients",
+    "/invoices",
+    "/products",
+    "/receivables",
+    "/suppliers",
+    "/settings",
+    "/settings/",
+  ];
+  const isRestrictedRoute = restrictedPaths.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  );
+
+  // The entitlement check is only relevant to these pages. Avoid a remote
+  // Supabase auth + database round-trip on public pages, dashboard and billing.
+  if (!isRestrictedRoute) return NextResponse.next();
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -52,20 +78,28 @@ export async function middleware(request: NextRequest) {
   // Si une session locale existe, tenter la vérification auprès de Supabase
   if (session) {
     try {
-      const { data } = await supabase.auth.getUser();
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        console.warn("Impossible de vérifier la session pour les droits d'abonnement:", error);
+        return supabaseResponse;
+      }
       if (data?.user) {
         user = data.user;
+      } else {
+        return supabaseResponse;
       }
     } catch {
-      // En mode hors-ligne, conserver la session locale valide
+      // A network failure is not evidence that an offline subscription is invalid.
+      return supabaseResponse;
     }
   }
 
   // --- Vérifier l'abonnement de l'entreprise associée à l'utilisateur ---
   let subscriptionValid = false;
+  let subscriptionStatusKnown = false;
   try {
     if (user) {
-      const { data: companies } = await supabase
+      const { data: companies, error } = await supabase
         .from("companies")
         .select(
           "id, subscription_plan, subscription_status, subscription_expires_at, trial_ends_at"
@@ -73,6 +107,11 @@ export async function middleware(request: NextRequest) {
         .eq("user_id", user.id)
         .limit(1);
 
+      if (error) {
+        console.warn("Impossible de vérifier l'abonnement côté serveur:", error);
+      } else {
+        subscriptionStatusKnown = true;
+      }
       const company = Array.isArray(companies) ? companies[0] : companies;
       if (company && company.subscription_status !== "suspended") {
         const now = new Date();
@@ -94,57 +133,13 @@ export async function middleware(request: NextRequest) {
       }
     }
   } catch (err) {
-    // En cas d'erreur côté réseau/Supabase, on ne bloque pas l'accès (favoriser usage hors-ligne)
-    subscriptionValid = true;
+    // A network/database failure is not evidence of a valid subscription.
+    console.warn("Impossible de vérifier l'abonnement côté serveur:", err);
   }
 
-  // ── Intercepter le callback OAuth Supabase arrivant sur n'importe quelle URL ──
-  const code = request.nextUrl.searchParams.get("code");
-  if (code && pathname !== "/auth/callback") {
-    const callbackUrl = request.nextUrl.clone();
-    callbackUrl.pathname = "/auth/callback";
-    return NextResponse.redirect(callbackUrl);
-  }
-
-  // Authentification gérée côté client/localStorage pour le mode PWA hors-ligne.
-  // Les redirections serveur agressives provoquent des rechargements, des boucles de connexion
-  // et empêchent l'utilisation locale des données quand l'utilisateur est déconnecté ou hors ligne.
-  // Si l'utilisateur est connecté mais que l'abonnement n'est pas valide,
-  // restreindre l'accès aux routes fonctionnelles (dashboard autorisé)
-  const restrictedPaths = [
-    "/quotes",
-    "/clients",
-    "/invoices",
-    "/products",
-    "/receivables",
-    "/suppliers",
-    "/settings",
-    "/settings/",
-  ];
-
-  const isRestrictedRoute = restrictedPaths.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  );
-
-  // Autoriser les chemins liés à l'authentification, setup, API et le dashboard
-  const allowedWhenUnsubscribed = [
-    "/dashboard",
-    "/subscription",
-    "/",
-    "/setup",
-    "/auth",
-    "/login",
-    "/register",
-    "/signin",
-    "/sign-in",
-    "/sign-up",
-    "/sign-up/",
-  ];
-  const isAllowed = allowedWhenUnsubscribed.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  );
-
-  if (user && !subscriptionValid && isRestrictedRoute && !isAllowed) {
+  // Fail open only when Supabase could not provide an authoritative answer;
+  // individual data actions still enforce authentication and database RLS.
+  if (user && subscriptionStatusKnown && !subscriptionValid) {
     // rediriger vers le tableau de bord avec indication d'abonnement requis
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";

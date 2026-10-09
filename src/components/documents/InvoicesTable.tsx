@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getOfflineInvoices, type OfflineInvoice } from "@/lib/offline-db";
 import type { Invoice, InvoiceStatus, Client } from "@/types";
+import { useAuthStore } from "@/store/auth.store";
 
 interface InvoicesTableProps {
   invoices: Invoice[];
@@ -30,30 +31,44 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [offlineInvoices, setOfflineInvoices] = useState<OfflineInvoice[]>([]);
+  const companyId = useAuthStore((state) => state.company?.id);
 
   useEffect(() => {
-    async function loadOffline() {
+    const loadOffline = async () => {
       const offline = await getOfflineInvoices();
-      setOfflineInvoices(offline);
-    }
+      setOfflineInvoices(offline.filter((invoice) => invoice.company_id === companyId));
+    };
     loadOffline();
 
     const handleSyncComplete = () => {
       loadOffline();
     };
 
+    window.addEventListener("pwa-offline-data-changed", loadOffline);
     window.addEventListener("pwa-sync-complete", handleSyncComplete);
-    return () => window.removeEventListener("pwa-sync-complete", handleSyncComplete);
-  }, []);
+    return () => {
+      window.removeEventListener("pwa-offline-data-changed", loadOffline);
+      window.removeEventListener("pwa-sync-complete", handleSyncComplete);
+    };
+  }, [companyId]);
 
   const combinedInvoices = useMemo(() => {
+    const serverIds = new Set(invoices.map((invoice) => invoice.id));
     const formattedOffline: Invoice[] = offlineInvoices
-      .filter((off) => off.sync_status === "pending_create")
+      .filter(
+        (off) =>
+          !serverIds.has(off.id) ||
+          off.sync_status === "pending_create" ||
+          off.sync_status === "pending_update"
+      )
       .map(
         (off) =>
           ({
             id: off.id,
-            invoice_number: `${off.invoice_number} (Local 🟡)`,
+            invoice_number:
+              off.sync_status === "pending_create"
+                ? `${off.invoice_number} (Local 🟡)`
+                : off.invoice_number,
             client: { name: off.client_name || "Client Local" } as unknown as Client,
             company_id: "offline_company",
             client_id: off.client_id || "",
@@ -64,13 +79,18 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
             discount: off.discount,
             notes: off.notes || "",
             due_date: off.due_date || null,
-            paid_at: null,
             created_at: off.created_at,
+            invoice_items: off.items.map((item, index) => ({
+              ...item,
+              invoice_id: off.id,
+              product_id: null,
+              id: `${off.id}-${index}`,
+            })),
             receivable: null,
-            is_offline: true,
-          }) as unknown as Invoice
+          }) as Invoice
       );
-    return [...formattedOffline, ...invoices];
+    const localIds = new Set(formattedOffline.map((invoice) => invoice.id));
+    return [...formattedOffline, ...invoices.filter((invoice) => !localIds.has(invoice.id))];
   }, [invoices, offlineInvoices]);
 
   // KPIs

@@ -1,7 +1,7 @@
 export const PLANS = {
-  monthly: { id: "monthly", label: "1 mois", months: 1, price: 300 },
-  quarter: { id: "quarter", label: "3 mois", months: 3, price: 900 },
-  year: { id: "year", label: "1 an", months: 12, price: 3500 },
+  monthly: { id: "monthly", label: "1 mois", durationLabel: "30 jours", months: 1, price: 300 },
+  quarter: { id: "quarter", label: "3 mois", durationLabel: "3 mois", months: 3, price: 900 },
+  year: { id: "year", label: "1 an", durationLabel: "1 an", months: 12, price: 3500 },
 };
 
 export type PlanId = keyof typeof PLANS;

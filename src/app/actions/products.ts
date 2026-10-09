@@ -51,14 +51,31 @@ export async function createProductAction(
   const companyId = await getCurrentCompanyId();
   if (!companyId) return { error: "Entreprise introuvable" };
 
-  if (companyId === OFFLINE_UUID) {
-    return {
-      error: "Impossible de créer un produit hors-ligne. Reconnectez-vous pour synchroniser.",
-    };
-  }
+  const offlineSyncIdValue = formData.get("offline_sync_id");
+  const offlineSyncId =
+    typeof offlineSyncIdValue === "string" &&
+    z.string().uuid().safeParse(offlineSyncIdValue).success
+      ? offlineSyncIdValue
+      : null;
+  if (offlineSyncIdValue && !offlineSyncId)
+    return { error: "Identifiant local de synchronisation invalide." };
+  if (companyId === OFFLINE_UUID)
+    return { error: "Connexion requise pour synchroniser le produit." };
 
   const supabase = await createClient();
+  if (offlineSyncId) {
+    const { data: existing, error: lookupError } = await supabase
+      .from("products")
+      .select("id")
+      .eq("id", offlineSyncId)
+      .eq("company_id", companyId)
+      .maybeSingle();
+    if (lookupError) return { error: "Impossible de vérifier le produit déjà synchronisé." };
+    if (existing) return { success: true };
+  }
+
   const { error } = await supabase.from("products").insert({
+    ...(offlineSyncId ? { id: offlineSyncId } : {}),
     company_id: companyId,
     name: parsed.data.name,
     description: parsed.data.description || null,
@@ -66,7 +83,18 @@ export async function createProductAction(
     price: parsed.data.price,
   });
 
-  if (error) return { error: "Erreur lors de la création du produit" };
+  if (error) {
+    if (offlineSyncId && error.code === "23505") {
+      const { data: existing } = await supabase
+        .from("products")
+        .select("id")
+        .eq("id", offlineSyncId)
+        .eq("company_id", companyId)
+        .maybeSingle();
+      if (existing) return { success: true };
+    }
+    return { error: "Erreur lors de la création du produit" };
+  }
 
   revalidatePath("/products");
   return { success: true };

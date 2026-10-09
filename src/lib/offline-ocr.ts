@@ -18,7 +18,18 @@ let workerInstance: Awaited<ReturnType<typeof createWorker>> | null = null;
  */
 async function getOCRWorker() {
   if (!workerInstance) {
-    const worker = await createWorker("fra"); // Reconnaissance en français
+    const worker = await createWorker(
+      "fra",
+      undefined,
+      {
+        workerPath: "/ocr/worker.min.js",
+        corePath: "/ocr/tesseract-core-lstm.wasm.js",
+        langPath: "/ocr",
+        gzip: true,
+        cacheMethod: "write",
+      },
+      {}
+    );
     workerInstance = worker;
   }
   return workerInstance;

@@ -14,9 +14,15 @@ import { Plus } from "lucide-react";
 import { SupplierQuickCreateDialog } from "@/components/suppliers/SupplierQuickCreateDialog";
 import { createProductAction, updateProductAction } from "@/app/actions/products";
 import { OfflineActionNotice } from "@/components/pwa/OfflineActionNotice";
-import { saveOfflineProduct, addToSyncQueue, registerBackgroundSync } from "@/lib/offline-db";
+import {
+  getOfflineProducts,
+  saveOfflineProduct,
+  addToSyncQueue,
+  registerBackgroundSync,
+} from "@/lib/offline-db";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Product, Supplier } from "@/types";
+import { useAuthStore } from "@/store/auth.store";
 
 interface ProductFormDialogProps {
   open: boolean;
@@ -62,6 +68,7 @@ export function ProductFormDialog({
   const [state, formAction, isPending] = useActionState(action, initialState);
   const formRef = useRef<HTMLFormElement | null>(null);
   const [isSavingOffline, setIsSavingOffline] = useState(false);
+  const [offlineError, setOfflineError] = useState<string | null>(null);
 
   useEffect(() => {
     if (state.success) onOpenChange(false);
@@ -69,11 +76,6 @@ export function ProductFormDialog({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     if (typeof window !== "undefined" && !navigator.onLine) {
-      if (isEditMode) {
-        e.preventDefault();
-        return;
-      }
-
       e.preventDefault();
       setIsSavingOffline(true);
 
@@ -83,12 +85,67 @@ export function ProductFormDialog({
       const supplier_id = String(fd.get("supplier_id") ?? "").trim() || null;
       const priceRaw = fd.get("price");
       const price = priceRaw ? Number(priceRaw) : 0;
+      const companyId = useAuthStore.getState().company?.id;
+      if (!companyId) {
+        setOfflineError("Entreprise introuvable. Reconnectez-vous avant de modifier le produit.");
+        setIsSavingOffline(false);
+        return;
+      }
 
-      const localId = `off_prod_${Date.now()}`;
+      if (isEditMode) {
+        const localProducts = await getOfflineProducts();
+        const existingProduct = localProducts.find(
+          (record) => record.id === product.id && record.company_id === companyId
+        );
+        if (!existingProduct) {
+          setOfflineError(
+            "Les données de ce produit ne sont pas enregistrées sur cet appareil. Reconnectez-vous pour les synchroniser."
+          );
+          setIsSavingOffline(false);
+          return;
+        }
+        const updatedProduct = {
+          ...existingProduct,
+          name,
+          supplier_id,
+          description: description || undefined,
+          unit_price: price,
+          sync_status:
+            existingProduct.sync_status === "pending_create" ? "pending_create" : "pending_update",
+        } as const;
+        try {
+          await saveOfflineProduct(updatedProduct);
+          await addToSyncQueue("UPDATE_PRODUCT", {
+            company_id: companyId,
+            id: product.id,
+            name,
+            description: description || null,
+            supplier_id: supplier_id || null,
+            price,
+            local_product: updatedProduct,
+          });
+          try {
+            await registerBackgroundSync();
+          } catch {
+            // Background Sync is optional.
+          }
+          setIsSavingOffline(false);
+          onOpenChange(false);
+        } catch (error) {
+          console.error("Erreur de modification hors-ligne du produit:", error);
+          setOfflineError("Impossible d'enregistrer les modifications sur cet appareil.");
+          setIsSavingOffline(false);
+        }
+        return;
+      }
+
+      const localId = crypto.randomUUID();
 
       const offlineProduct = {
         id: localId,
+        company_id: companyId,
         name,
+        supplier_id,
         description: description || undefined,
         unit_price: price,
         cost_price: undefined,
@@ -101,6 +158,7 @@ export function ProductFormDialog({
       try {
         await saveOfflineProduct(offlineProduct);
         await addToSyncQueue("CREATE_PRODUCT", {
+          company_id: companyId,
           name,
           description: description || null,
           supplier_id: supplier_id || null,
@@ -110,11 +168,14 @@ export function ProductFormDialog({
 
         try {
           await registerBackgroundSync();
-        } catch (err) {
+        } catch {
           // ignore
         }
       } catch (err) {
         console.error("Erreur enregistrant produit hors-ligne:", err);
+        setOfflineError("Impossible d'enregistrer ce produit sur cet appareil.");
+        setIsSavingOffline(false);
+        return;
       }
 
       setIsSavingOffline(false);
@@ -145,6 +206,14 @@ export function ProductFormDialog({
               role="alert"
             >
               {state.error}
+            </div>
+          )}
+          {offlineError && (
+            <div
+              className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 mb-4 text-sm"
+              role="alert"
+            >
+              {offlineError}
             </div>
           )}
 

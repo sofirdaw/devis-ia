@@ -14,9 +14,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createClientAction, updateClientAction } from "@/app/actions/clients";
 import { OfflineActionNotice } from "@/components/pwa/OfflineActionNotice";
-import { saveOfflineClient, addToSyncQueue, registerBackgroundSync } from "@/lib/offline-db";
+import {
+  getOfflineClients,
+  saveOfflineClient,
+  addToSyncQueue,
+  registerBackgroundSync,
+} from "@/lib/offline-db";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Client } from "@/types";
+import { useAuthStore } from "@/store/auth.store";
 
 interface ClientFormDialogProps {
   open: boolean;
@@ -36,15 +42,10 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
 
   const formRef = useRef<HTMLFormElement | null>(null);
   const [isSavingOffline, setIsSavingOffline] = useState(false);
+  const [offlineError, setOfflineError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     if (typeof window !== "undefined" && !navigator.onLine) {
-      // Only allow creating clients offline for now
-      if (isEditMode) {
-        e.preventDefault();
-        return;
-      }
-
       e.preventDefault();
       setIsSavingOffline(true);
 
@@ -53,11 +54,65 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
       const phone = String(fd.get("phone") ?? "").trim();
       const email = String(fd.get("email") ?? "").trim();
       const address = String(fd.get("address") ?? "").trim();
+      const companyId = useAuthStore.getState().company?.id;
+      if (!companyId) {
+        setOfflineError("Entreprise introuvable. Reconnectez-vous avant de modifier le client.");
+        setIsSavingOffline(false);
+        return;
+      }
 
-      const localId = `off_${Date.now()}`;
+      if (isEditMode) {
+        const localClients = await getOfflineClients();
+        const existingClient = localClients.find(
+          (record) => record.id === client.id && record.company_id === companyId
+        );
+        if (!existingClient) {
+          setOfflineError(
+            "Les données de ce client ne sont pas enregistrées sur cet appareil. Reconnectez-vous pour les synchroniser."
+          );
+          setIsSavingOffline(false);
+          return;
+        }
+        const updatedClient = {
+          ...existingClient,
+          name,
+          phone: phone || undefined,
+          email: email || undefined,
+          address: address || undefined,
+          sync_status:
+            existingClient.sync_status === "pending_create" ? "pending_create" : "pending_update",
+        } as const;
+        try {
+          await saveOfflineClient(updatedClient);
+          await addToSyncQueue("UPDATE_CLIENT", {
+            company_id: companyId,
+            id: client.id,
+            name,
+            phone: phone || null,
+            email: email || null,
+            address: address || null,
+            local_client: updatedClient,
+          });
+          try {
+            await registerBackgroundSync();
+          } catch {
+            // Background Sync is optional.
+          }
+          setIsSavingOffline(false);
+          onOpenChange(false);
+        } catch (error) {
+          console.error("Erreur de modification hors-ligne du client:", error);
+          setOfflineError("Impossible d'enregistrer les modifications sur cet appareil.");
+          setIsSavingOffline(false);
+        }
+        return;
+      }
+
+      const localId = crypto.randomUUID();
 
       const offlineClient = {
         id: localId,
+        company_id: companyId,
         name,
         phone: phone || undefined,
         email: email || undefined,
@@ -69,6 +124,7 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
       try {
         await saveOfflineClient(offlineClient);
         await addToSyncQueue("CREATE_CLIENT", {
+          company_id: companyId,
           name,
           phone: phone || null,
           email: email || null,
@@ -78,11 +134,14 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
 
         try {
           await registerBackgroundSync();
-        } catch (err) {
+        } catch {
           // ignore
         }
       } catch (err) {
         console.error("Erreur enregistrant client hors-ligne:", err);
+        setOfflineError("Impossible d'enregistrer ce client sur cet appareil.");
+        setIsSavingOffline(false);
+        return;
       }
 
       setIsSavingOffline(false);
@@ -115,6 +174,14 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
             role="alert"
           >
             {state.error}
+          </div>
+        )}
+        {offlineError && (
+          <div
+            className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 mb-4 text-sm"
+            role="alert"
+          >
+            {offlineError}
           </div>
         )}
 

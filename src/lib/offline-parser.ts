@@ -97,7 +97,7 @@ export function parseDocumentOfflineText(
 
   // Patterns pour repérer le client
   const clientRegex =
-    /(?:fais\s+(?:un\s+)?(?:devis|facture)\s+pour|créer\s+(?:un\s+)?(?:devis|facture)\s+pour|devis\s+pour|facture\s+pour|client\s*:?)\s+([A-Za-zÀ-ÿ0-9_-]+)/i;
+    /(?:fais\s+(?:un\s+)?(?:devis|facture)\s+pour|créer\s+(?:un\s+)?(?:devis|facture)\s+pour|devis\s+pour|facture\s+pour|client\s*:?)\s+([A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9_'’-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9_'’-]*){0,4})(?=\s*(?:[:,;.\n]|\d|$|pour\s+(?:achat|vente|fourniture)))/i;
 
   const clientMatch = workingText.match(clientRegex);
   if (clientMatch && clientMatch[1]) {
@@ -200,7 +200,7 @@ export function parseDocumentOfflineText(
 
   // Si aucun article trouvé avec prix, tenter un matching direct sur l'ensemble du texte
   if (items.length === 0 && workingText) {
-    parseSingleItemCandidate(workingText, items, products, true);
+    parseSingleItemCandidate(workingText, items, products);
   }
 
   if (items.length === 0) {
@@ -315,8 +315,7 @@ function parseSingleItemCandidate(
     quantity: number;
     unit_price: number;
   }>,
-  products: Product[] = [],
-  allowZeroPrice: boolean = false
+  products: Product[] = []
 ) {
   let clean = line.trim();
   const lower = clean.toLowerCase();
@@ -361,7 +360,7 @@ function parseSingleItemCandidate(
       const finalPrice = matchedProduct?.price ?? unitPrice;
 
       if (!finalDesignation || finalDesignation.length < 2) return;
-      if (finalPrice === 0 && !matchedProduct && !allowZeroPrice) return;
+      if (finalPrice <= 0 && !matchedProduct) return;
 
       items.push({
         product_id: matchedProduct?.id ?? null,
@@ -418,7 +417,7 @@ function parseSingleItemCandidate(
   // 3. Extraction du prix unitaire
   let unitPrice = 0;
   const priceRegex =
-    /(?:à|au prix de|pour|coûtant|coûte|prix\s*:?|:|@)?\s*(\d{1,3}(?:[\s\.]\d{3})+|\d+k?)\s*(?:fcfa|cfa|f|frs?|francs?|\$|€)?\s*$/i;
+    /(?:à|au prix de|pour|coûtant|coûte|prix\s*:?|:|@)?\s*(\d{1,3}(?:[\s\.]\d{3})+|\d+k?)\s*(?:fcfa|cfa|f|frs?|francs?|\$|€)?(?:\s*(?:chacun(?:e)?|l['’]un(?:e)?|par\s+(?:unité|piece))?)\s*$/i;
 
   const priceMatch = clean.match(priceRegex);
   if (priceMatch && priceMatch[1]) {
@@ -471,7 +470,7 @@ function parseSingleItemCandidate(
   const finalPrice = matchedProduct?.price ?? unitPrice;
 
   // Si le prix est 0 et que le produit n'existe pas au catalogue, ignorer
-  if (finalPrice === 0 && !matchedProduct && !allowZeroPrice) {
+  if (finalPrice <= 0 && !matchedProduct) {
     return;
   }
 

@@ -146,10 +146,34 @@
         <a href="/dashboard" class="btn btn-primary">Tableau de bord hors-ligne</a>
         <a href="/quotes" class="btn btn-secondary">Consulter mes devis</a>
         <a href="/invoices" class="btn btn-secondary">Consulter mes factures</a>
-        <button onclick="window.location.reload()" class="btn btn-secondary">
-          Réessayer la connexion
-        </button>
+        <button id="retry-connection" class="btn btn-secondary">Réessayer la connexion</button>
       </div>
     </div>
+    <script>
+      const retryButton = document.getElementById("retry-connection");
+      const reloadWhenOnline = async () => {
+        retryButton.textContent = "Vérification de la connexion…";
+        try {
+          const response = await fetch("/", {
+            method: "HEAD",
+            cache: "no-store",
+            credentials: "same-origin",
+          });
+          if (response.ok) {
+            window.location.reload();
+            return;
+          }
+        } catch {
+          // Le test HEAD ne passe pas par le cache du service worker.
+        }
+        retryButton.textContent = "Toujours hors ligne — réessayer";
+      };
+
+      retryButton.addEventListener("click", reloadWhenOnline);
+      window.addEventListener("online", () => window.setTimeout(reloadWhenOnline, 150));
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && navigator.onLine) reloadWhenOnline();
+      });
+    </script>
   </body>
 </html>

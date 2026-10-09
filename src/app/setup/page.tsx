@@ -108,7 +108,7 @@ export default function SetupPage() {
             <Input
               name="name"
               label="Nom de l'entreprise"
-              placeholder="Ma Petite Entreprise SARL"
+              placeholder="Votre entreprise "
               required
             />
 
@@ -118,7 +118,7 @@ export default function SetupPage() {
                 name="email"
                 type="email"
                 label="Email professionnel"
-                placeholder="contact@entreprise.com"
+                placeholder="info@gmail.com"
               />
             </div>
 
@@ -129,6 +129,16 @@ export default function SetupPage() {
               <Input name="ifu" label="IFU" placeholder="Identifiant Fiscal" />
               <Input name="cme" label="CME" placeholder="Centre des Métiers" />
             </div>
+            <label className="flex items-start gap-2 rounded-lg border border-gray-200 p-3 text-sm text-gray-700">
+              <input type="checkbox" name="use_pdf_header" defaultChecked className="mt-1" />
+              <span>
+                Utiliser l&apos;en-tête de mon entreprise sur mes devis et factures PDF
+                <span className="mt-1 block text-xs text-gray-500">
+                  Vous pourrez modifier ce choix séparément pour les devis et les factures dans les
+                  paramètres.
+                </span>
+              </span>
+            </label>
 
             {/*<Input
               name="default_quote_notes"

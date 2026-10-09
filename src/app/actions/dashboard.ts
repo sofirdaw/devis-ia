@@ -10,12 +10,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentCompanyForAction } from "@/lib/current-company";
 import { dashboardCacheKey, getCached, setCached } from "@/lib/cache";
+import { getRecentInvoiceFinance, summarizeInvoiceFinancials } from "@/lib/dashboard-financials";
 
 export type DashboardStats = {
   quotesCount: number;
   invoicesCount: number;
-  totalRevenue: number; // Somme des factures payées
-  unpaidAmount: number; // Somme des factures envoyées + en retard
+  totalRevenue: number; // Somme réellement encaissée, paiements partiels inclus
+  unpaidAmount: number; // Soldes restant à encaisser
   unpaidCount: number;
   recentQuotes: Array<{
     id: string;
@@ -32,6 +33,8 @@ export type DashboardStats = {
     status: string;
     created_at: string;
     client_name: string;
+    paid_amount: number;
+    remaining_amount: number;
   }>;
   monthlyRevenue: Array<{ month: string; revenue: number }>;
 };
@@ -81,31 +84,24 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
     const [
       quotesRes,
       invoicesRes,
-      paidInvoicesRes,
-      unpaidInvoicesRes,
       recentQuotesRes,
       recentInvoicesRes,
-      yearInvoicesRes,
+      financialInvoicesRes,
+      receivablesRes,
     ] = await Promise.allSettled([
       supabase
         .from("quotes")
         .select("id", { count: "exact", head: true })
         .eq("company_id", company.id)
+        .neq("status", "cancelled")
         .gte("created_at", startOfMonth.toISOString()),
 
       supabase
         .from("invoices")
         .select("id", { count: "exact", head: true })
         .eq("company_id", company.id)
+        .neq("status", "cancelled")
         .gte("created_at", startOfMonth.toISOString()),
-
-      supabase.from("invoices").select("total").eq("company_id", company.id).eq("status", "paid"),
-
-      supabase
-        .from("invoices")
-        .select("total")
-        .eq("company_id", company.id)
-        .in("status", ["sent", "overdue"]),
 
       supabase
         .from("quotes")
@@ -123,39 +119,54 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
 
       supabase
         .from("invoices")
-        .select("total, created_at")
+        .select("id, total, status, created_at")
         .eq("company_id", company.id)
-        .gte("created_at", `${new Date().getFullYear()}-01-01`),
+        .lte("created_at", new Date().toISOString()),
+
+      supabase
+        .from("receivables")
+        .select(
+          "invoice_id, total_amount, paid_amount, remaining_amount, status, payment_transactions(amount, payment_date)"
+        )
+        .eq("company_id", company.id),
     ]);
 
     const quotesCount = quotesRes.status === "fulfilled" ? (quotesRes.value.count ?? 0) : 0;
     const invoicesCount = invoicesRes.status === "fulfilled" ? (invoicesRes.value.count ?? 0) : 0;
-
-    const paidInvoices =
-      paidInvoicesRes.status === "fulfilled" ? (paidInvoicesRes.value.data ?? []) : [];
-    const unpaidInvoices =
-      unpaidInvoicesRes.status === "fulfilled" ? (unpaidInvoicesRes.value.data ?? []) : [];
 
     const recentQuotesRaw =
       recentQuotesRes.status === "fulfilled" ? (recentQuotesRes.value.data ?? []) : [];
     const recentInvoicesRaw =
       recentInvoicesRes.status === "fulfilled" ? (recentInvoicesRes.value.data ?? []) : [];
 
-    const yearInvoices =
-      yearInvoicesRes.status === "fulfilled" ? (yearInvoicesRes.value.data ?? []) : [];
+    const financialInvoices =
+      financialInvoicesRes.status === "fulfilled" ? (financialInvoicesRes.value.data ?? []) : [];
 
-    const totalRevenue = paidInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
-    const unpaidAmount = unpaidInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+    const receivables =
+      receivablesRes.status === "fulfilled" ? (receivablesRes.value.data ?? []) : [];
 
-    const monthlyTotals = new Array(12).fill(0);
-    yearInvoices.forEach((inv) => {
-      if (inv.created_at) {
-        const monthIndex = new Date(inv.created_at).getMonth();
-        if (monthIndex >= 0 && monthIndex < 12) {
-          monthlyTotals[monthIndex] += inv.total || 0;
-        }
-      }
-    });
+    const {
+      totalRevenue,
+      unpaidAmount,
+      unpaidCount,
+      monthlyRevenue: monthlyTotals,
+    } = summarizeInvoiceFinancials(
+      financialInvoices as Array<{
+        id: string;
+        total: number;
+        status: string;
+        created_at: string;
+      }>,
+      receivables as Array<{
+        invoice_id: string;
+        total_amount: number;
+        paid_amount: number;
+        remaining_amount: number;
+        status: string;
+        payment_transactions?: Array<{ amount: number; payment_date: string }>;
+      }>,
+      new Date().getFullYear()
+    );
 
     const monthlyRevenue = MONTH_LABELS.map((month, i) => ({
       month,
@@ -170,6 +181,11 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       client: { name: string } | null;
       quote_number?: string;
       invoice_number?: string;
+      receivable?: {
+        paid_amount: number;
+        remaining_amount: number;
+        status: string;
+      };
     };
 
     const stats: DashboardStats = {
@@ -177,7 +193,7 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       invoicesCount,
       totalRevenue,
       unpaidAmount,
-      unpaidCount: unpaidInvoices.length,
+      unpaidCount,
       recentQuotes: (recentQuotesRaw as unknown as RawDoc[]).map((q) => ({
         id: q.id,
         quote_number: q.quote_number || "DEV-???",
@@ -190,7 +206,23 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
         id: inv.id,
         invoice_number: inv.invoice_number || "FAC-???",
         total: inv.total || 0,
-        status: inv.status || "draft",
+        ...getRecentInvoiceFinance(
+          {
+            id: inv.id,
+            total: inv.total || 0,
+            status: inv.status || "draft",
+            created_at: inv.created_at || new Date().toISOString(),
+          },
+          (
+            receivables as Array<{
+              invoice_id: string;
+              total_amount: number;
+              paid_amount: number;
+              remaining_amount: number;
+              status: string;
+            }>
+          ).find((receivable) => receivable.invoice_id === inv.id)
+        ),
         created_at: inv.created_at || new Date().toISOString(),
         client_name: inv.client?.name ?? "—",
       })),

@@ -9,7 +9,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Search, DollarSign, Calendar, FileText, ArrowRight, Pencil, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,14 @@ import { ReceivableFormDialog } from "./ReceivableFormDialog";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { deleteReceivableAction } from "@/app/actions/receivables";
 import type { Receivable } from "@/types";
+import {
+  addToSyncQueue,
+  getOfflineSnapshot,
+  getSyncQueue,
+  removeFromSyncQueue,
+  saveOfflineSnapshot,
+} from "@/lib/offline-db";
+import { useAuthStore } from "@/store/auth.store";
 
 interface ReceivablesTableProps {
   initialReceivables: Receivable[];
@@ -33,20 +41,91 @@ const statusConfig = {
 
 export function ReceivablesTable({ initialReceivables }: ReceivablesTableProps) {
   const [search, setSearch] = useState("");
+  const [cachedReceivables, setCachedReceivables] = useState<Receivable[]>([]);
+  const [snapshotLoaded, setSnapshotLoaded] = useState(false);
+  const companyId = useAuthStore((state) => state.company?.id);
   const [editingReceivable, setEditingReceivable] = useState<Receivable | undefined>();
   const [deletingReceivable, setDeletingReceivable] = useState<Receivable | undefined>();
+
+  useEffect(() => {
+    if (!companyId) return;
+    let active = true;
+    const loadSnapshot = async () => {
+      const snapshot = await getOfflineSnapshot(companyId);
+      if (active) {
+        setCachedReceivables(snapshot?.receivables ?? []);
+        setSnapshotLoaded(Boolean(snapshot));
+      }
+    };
+    void loadSnapshot();
+    window.addEventListener("pwa-offline-data-changed", loadSnapshot);
+    window.addEventListener("pwa-offline-snapshot-ready", loadSnapshot);
+    return () => {
+      active = false;
+      window.removeEventListener("pwa-offline-data-changed", loadSnapshot);
+      window.removeEventListener("pwa-offline-snapshot-ready", loadSnapshot);
+    };
+  }, [companyId]);
+
+  const receivables = useMemo(() => {
+    if (typeof navigator !== "undefined" && !navigator.onLine && snapshotLoaded) {
+      return cachedReceivables;
+    }
+    const ids = new Set(initialReceivables.map((item) => item.id));
+    return [...initialReceivables, ...cachedReceivables.filter((item) => !ids.has(item.id))];
+  }, [cachedReceivables, initialReceivables, snapshotLoaded]);
+
+  const handleDeleteReceivable = async (receivable: Receivable) => {
+    if (navigator.onLine) return deleteReceivableAction(receivable.id);
+    if (!companyId) return { error: "Entreprise locale introuvable." };
+
+    try {
+      const [snapshot, queue] = await Promise.all([getOfflineSnapshot(companyId), getSyncQueue()]);
+      const local = snapshot?.receivables.find((item) => item.id === receivable.id);
+      if (!snapshot || !local) return { error: "Cette créance n'est pas disponible localement." };
+      const hasPendingPayment = queue.some(
+        (item) =>
+          item.action === "ADD_PAYMENT" &&
+          item.payload.receivable_id === receivable.id &&
+          item.payload.company_id === companyId
+      );
+      if ((local.payment_transactions?.length ?? 0) > 0 || hasPendingPayment) {
+        return { error: "Impossible de supprimer : des paiements sont associés à cette créance." };
+      }
+
+      const queueId = await addToSyncQueue("DELETE_RECEIVABLE", {
+        company_id: companyId,
+        id: receivable.id,
+      });
+      try {
+        await saveOfflineSnapshot({
+          ...snapshot,
+          receivables: snapshot.receivables.filter((item) => item.id !== receivable.id),
+        });
+      } catch (error) {
+        await removeFromSyncQueue(queueId);
+        throw error;
+      }
+      return;
+    } catch (error) {
+      console.error("Erreur de suppression locale de créance:", error);
+      return {
+        error: error instanceof Error ? error.message : "Impossible de supprimer cette créance.",
+      };
+    }
+  };
 
   // Filtrage local — recherche par client, facture
   const filteredReceivables = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return initialReceivables;
+    if (!term) return receivables;
 
-    return initialReceivables.filter(
+    return receivables.filter(
       (r) =>
         r.client?.name?.toLowerCase().includes(term) ||
         r.invoice?.invoice_number?.toLowerCase().includes(term)
     );
-  }, [initialReceivables, search]);
+  }, [receivables, search]);
 
   return (
     <>
@@ -181,7 +260,7 @@ export function ReceivablesTable({ initialReceivables }: ReceivablesTableProps) 
           onOpenChange={(open) => !open && setDeletingReceivable(undefined)}
           title="Supprimer cette créance ?"
           description={`La créance de la facture "${deletingReceivable.invoice?.invoice_number}" sera définitivement supprimée. Cette action est irréversible.`}
-          onConfirm={() => deleteReceivableAction(deletingReceivable.id)}
+          onConfirm={() => handleDeleteReceivable(deletingReceivable)}
         />
       )}
     </>

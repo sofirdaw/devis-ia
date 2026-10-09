@@ -17,6 +17,9 @@ import { TotalsSummary } from "./TotalsSummary";
 import { updateQuoteAction } from "@/app/actions/quotes";
 import type { ActionResult } from "@/app/actions/auth";
 import type { Client, Product, Quote } from "@/types";
+import { addToSyncQueue, registerBackgroundSync, saveOfflineQuote } from "@/lib/offline-db";
+import { useAuthStore } from "@/store/auth.store";
+import { OfflineActionNotice } from "@/components/pwa/OfflineActionNotice";
 
 interface QuoteEditFormProps {
   quote: Quote;
@@ -39,9 +42,81 @@ export function QuoteEditForm({ quote, clients, products, taxRate }: QuoteEditFo
   );
   const [discount, setDiscount] = useState(quote.discount);
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(quote.client_id);
+  const [isSavingOffline, setIsSavingOffline] = useState(false);
+  const [offlineError, setOfflineError] = useState<string | null>(null);
 
   const action = updateQuoteAction.bind(null, quote.id);
   const [state, formAction, isPending] = useActionState(action, initialState);
+  const companyId = useAuthStore((store) => store.company?.id);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    if (navigator.onLine) return;
+    event.preventDefault();
+    if (!companyId || quote.company_id !== companyId) {
+      setOfflineError("Entreprise indisponible hors ligne. Reconnectez-vous puis réessayez.");
+      return;
+    }
+
+    setIsSavingOffline(true);
+    setOfflineError(null);
+    const formData = new FormData(event.currentTarget);
+    const discountValue = Number(formData.get("discount") ?? 0);
+    const notes = String(formData.get("notes") ?? "");
+    const validUntil = String(formData.get("valid_until") ?? "");
+    const subtotal = items.reduce(
+      (sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0),
+      0
+    );
+    const tax = (subtotal - discountValue) * (taxRate / 100);
+    const localQuote = {
+      id: quote.id,
+      company_id: companyId,
+      quote_number: quote.quote_number,
+      client_name: clients.find((client) => client.id === selectedClientId)?.name,
+      client_id: selectedClientId,
+      status: quote.status,
+      subtotal,
+      tax,
+      discount: discountValue,
+      valid_until: validUntil || undefined,
+      total: subtotal - discountValue + tax,
+      notes,
+      created_at: quote.created_at,
+      items: items.map((item) => ({
+        designation: item.designation,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total: item.quantity * item.unit_price,
+      })),
+      sync_status: "pending_update" as const,
+    };
+    const payload = {
+      company_id: companyId,
+      id: quote.id,
+      client_id: selectedClientId,
+      discount: discountValue,
+      valid_until: validUntil,
+      notes,
+      items,
+      local_quote: localQuote,
+    };
+
+    try {
+      await saveOfflineQuote(localQuote);
+      await addToSyncQueue("UPDATE_QUOTE", payload);
+      try {
+        await registerBackgroundSync();
+      } catch {
+        // Online-event synchronization remains available when Background Sync is unsupported.
+      }
+      router.push("/quotes");
+    } catch (error) {
+      console.error("Erreur de sauvegarde hors-ligne du devis:", error);
+      setOfflineError("Impossible d'enregistrer les modifications sur cet appareil.");
+    } finally {
+      setIsSavingOffline(false);
+    }
+  };
 
   // Dès que la mise à jour est réussie, naviguer vers le devis pour que le PDF soit immédiatement à jour
   useEffect(() => {
@@ -55,7 +130,16 @@ export function QuoteEditForm({ quote, clients, products, taxRate }: QuoteEditFo
   const selectedClient = clients.find((c) => c.id === selectedClientId);
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} onSubmit={handleSubmit} className="space-y-6">
+      <OfflineActionNotice />
+      {offlineError && (
+        <div
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          role="alert"
+        >
+          {offlineError}
+        </div>
+      )}
       {state.error && (
         <div
           className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"
@@ -154,7 +238,7 @@ export function QuoteEditForm({ quote, clients, products, taxRate }: QuoteEditFo
           <Button
             type="submit"
             size="lg"
-            isLoading={isPending}
+            isLoading={isPending || isSavingOffline}
             className="w-full sm:w-auto px-8 lg:px-10 shadow-lg"
           >
             {isPending ? "Enregistrement..." : "Enregistrer les modifications"}

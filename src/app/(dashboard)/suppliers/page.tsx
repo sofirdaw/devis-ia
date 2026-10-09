@@ -51,7 +51,7 @@ export default async function SuppliersPage() {
             <Button leftIcon={<Plus size={16} />}>Nouveau fournisseur</Button>
           </Link>
         </div>
-        <SuppliersTable suppliers={suppliers} />
+        <SuppliersTable suppliers={suppliers} companyId={company.id} />
       </div>
     </>
   );

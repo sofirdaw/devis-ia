@@ -11,6 +11,8 @@ Application web moderne de gestion de devis et factures avec intelligence artifi
 - **Authentification sécurisée** : Intégration avec Clerk
 - **Base de données robuste** : Supabase avec Row Level Security
 - **Interface moderne** : Design responsive avec Tailwind CSS
+- **Mode hors-ligne** : Cache local des données métier, créations/modifications/suppressions en file d'attente, puis synchronisation au retour du réseau
+- **OCR local** : Reconnaissance française exécutée sur l'appareil, sans appel réseau après le chargement initial
 
 ## 📋 Prérequis
 
@@ -82,6 +84,50 @@ Supabase, les entreprises disposent des dates `trial_started_at` et
 `trial_ends_at` pour l'essai gratuit, ainsi que `subscription_started_at` et
 `subscription_expires_at` pour les abonnements payants. Un administrateur peut
 suspendre ou réactiver un compte depuis `/admin/subscriptions`.
+
+Pour utiliser le mode hors-ligne, l'utilisateur doit d'abord se connecter avec
+Internet, ouvrir l'application et attendre le snapshot ainsi que le précache des
+routes et ressources locales. Clients, produits, fournisseurs, devis, factures,
+créances, paramètres d'entreprise et logo sont alors disponibles depuis
+l'appareil. Les modifications métier et paiements de créances pris en charge
+sont enregistrés localement et rejoués dans l'ordre au retour du réseau. Les
+écrans visités/préchargés peuvent être rouverts sans connexion ; les nouvelles
+connexions, générations IA, conversions nécessitant une validation distante et
+PDF distants restent indisponibles hors-ligne.
+
+L'accès reste limité à la date d'expiration d'abonnement connue par l'appareil.
+Un achat, une confirmation de paiement ou une activation d'abonnement requiert
+Internet et une validation serveur ; le client n'accorde jamais localement un
+abonnement payant. Les mutations locales de paramètres ne modifient pas le
+forfait. Avant déploiement, appliquer dans Supabase
+`supabase/migrations/migration_idempotent_offline_receivable_payments.sql`
+pour assurer l'idempotence des paiements de créances, ainsi que
+`supabase/migrations/migration_harden_manual_subscription_payments.sql` pour
+les garde-fous des paiements d'abonnement.
+
+Pour les PDF, appliquer également
+`supabase/migrations/migration_add_pdf_templates.sql` dans Supabase. Chaque
+entreprise peut alors sélectionner séparément un modèle classique, moderne ou
+minimaliste pour ses devis et ses factures, et activer ou désactiver l'en-tête
+de chacun. L'en-tête reprend le logo et les coordonnées de l'entreprise ainsi
+que les identifiants renseignés (RCCM, IFU et CME). Pour afficher les activités
+ou services de l'entreprise à droite du logo et de son nom, renseigner le champ
+dédié dans les préférences puis appliquer
+`supabase/migrations/migration_add_company_service_description.sql`.
+Pour conserver la synchronisation entre factures, créances et paiements,
+appliquer d'abord `supabase/migrations/fix_receivable_invoice_sync.sql`, puis
+`supabase/migrations/migration_add_cancelled_document_status.sql`. Cette
+dernière ajoute l'annulation des devis, factures et créances liées ; les montants
+annulés sont exclus des soldes actifs, sans supprimer l'historique des paiements.
+Le tableau de bord utilise les transactions de paiement, y compris les
+règlements partiels, en ligne comme hors ligne.
+
+Les ressources du moteur OCR français sont copiées depuis les dépendances
+pendant `npm run dev` et `npm run build`, puis précachées par le service worker.
+Le premier démarrage doit donc se faire en ligne pour charger le modèle OCR et
+les routes de l'application utilisées hors-ligne. Le service worker n'est pas
+activé en développement : valider le parcours réseau coupé sur un build de
+production servi par `npm run start` ou sur l'application déployée.
 
 ### 6. Lancer le projet
 

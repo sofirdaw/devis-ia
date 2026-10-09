@@ -10,9 +10,9 @@ import { NetworkGuard } from "@/components/pwa/NetworkGuard";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Devis IA — Devis & Factures Intelligents 100% Hors-Ligne",
+  title: "Devis IA — Devis & Factures Intelligents en quelques clics",
   description:
-    "Créez des devis et factures professionnels en quelques secondes avec ou sans connexion Internet.",
+    "Créez des devis et factures professionnels en quelques secondes.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

@@ -5,12 +5,13 @@
 
 "use client";
 
-import { useState, useRef, useTransition } from "react";
+import { useEffect, useState, useRef, useTransition } from "react";
 import { Building2, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardBody } from "@/components/ui/card";
 import { uploadCompanyLogoAction } from "@/app/actions/company";
 import { useAuthStore } from "@/store/auth.store";
+import { addToSyncQueue, getSyncQueue, removeFromSyncQueue } from "@/lib/offline-db";
 
 interface LogoUploadFormProps {
   companyId: string;
@@ -23,9 +24,9 @@ async function compressImageFile(
   maxWidth: number = 800,
   quality: number = 0.85
 ): Promise<File> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) {
-      resolve(file);
+      reject(new Error("Le fichier doit être une image."));
       return;
     }
 
@@ -49,7 +50,7 @@ async function compressImageFile(
 
         const ctx = canvas.getContext("2d");
         if (!ctx) {
-          resolve(file);
+          reject(new Error("Impossible de convertir l'image pour le PDF."));
           return;
         }
 
@@ -57,22 +58,22 @@ async function compressImageFile(
         canvas.toBlob(
           (blob) => {
             if (blob) {
-              const compressed = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
-                type: "image/webp",
+              const compressed = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                type: "image/jpeg",
                 lastModified: Date.now(),
               });
               resolve(compressed);
             } else {
-              resolve(file);
+              reject(new Error("Impossible de convertir le logo en image JPEG."));
             }
           },
-          "image/webp",
+          "image/jpeg",
           quality
         );
       };
-      img.onerror = () => resolve(file);
+      img.onerror = () => reject(new Error("Impossible de lire le logo."));
     };
-    reader.onerror = () => resolve(file);
+    reader.onerror = () => reject(new Error("Erreur de lecture du logo."));
   });
 }
 
@@ -83,6 +84,27 @@ export function LogoUploadForm({ companyId, currentLogoUrl }: LogoUploadFormProp
   const [success, setSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getSyncQueue()
+      .then((queue) => {
+        const pendingLogo = [...queue]
+          .reverse()
+          .find(
+            (item) => item.action === "UPDATE_COMPANY_LOGO" && item.payload.company_id === companyId
+          );
+        if (active && typeof pendingLogo?.payload.data_url === "string") {
+          setPreview(pendingLogo.payload.data_url);
+        }
+      })
+      .catch((queueError) => {
+        console.error("Impossible de charger le logo local en attente:", queueError);
+      });
+    return () => {
+      active = false;
+    };
+  }, [companyId]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawFile = e.target.files?.[0];
@@ -95,51 +117,78 @@ export function LogoUploadForm({ companyId, currentLogoUrl }: LogoUploadFormProp
     setSuccess(false);
 
     // Compression ultra-rapide côté client
-    const file = await compressImageFile(rawFile, 800, 0.85);
-
-    // Convertir en Data URL Base64 pour persistance 100% hors-ligne dans localStorage
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const base64DataUrl = reader.result as string;
-      setPreview(base64DataUrl);
-      if (company) {
-        setCompany({
-          ...company,
-          logo_url: base64DataUrl,
-        });
+    try {
+      const file = await compressImageFile(rawFile, 800, 0.85);
+      if (file.size > 2 * 1024 * 1024) {
+        throw new Error("Le logo compressé dépasse la limite de 2 Mo.");
       }
-    };
+      const base64DataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error ?? new Error("Lecture du logo impossible."));
+      });
+      setPreview(base64DataUrl);
+      URL.revokeObjectURL(localPreview);
+      const queueLogo = async () => {
+        const queued = await getSyncQueue();
+        const queueId = await addToSyncQueue("UPDATE_COMPANY_LOGO", {
+          company_id: companyId,
+          data_url: base64DataUrl,
+          file_name: file.name,
+          mime_type: file.type,
+        });
+        await Promise.all(
+          queued
+            .filter(
+              (item) =>
+                item.action === "UPDATE_COMPANY_LOGO" && item.payload.company_id === companyId
+            )
+            .map((item) => removeFromSyncQueue(item.id))
+        );
+        return queueId;
+      };
 
-    // Si connecté, synchroniser vers Supabase Storage en arrière-plan
-    const isOnline = typeof window !== "undefined" && navigator.onLine;
-    if (isOnline) {
-      const formData = new FormData();
-      formData.append("logo", file);
-
-      startTransition(async () => {
-        try {
-          const result = await uploadCompanyLogoAction(companyId, formData);
-          if (result.error) {
-            // Même si Supabase échoue, le logo local reste sauvegardé
-            console.warn("Upload Supabase échoué, logo conservé localement:", result.error);
-          } else if ((result as { logoUrl?: string }).logoUrl) {
-            if (company) {
-              setCompany({
-                ...company,
-                logo_url: (result as { logoUrl?: string }).logoUrl!,
-              });
+      if (navigator.onLine) {
+        const formData = new FormData();
+        formData.append("logo", file);
+        startTransition(async () => {
+          try {
+            const result = await uploadCompanyLogoAction(companyId, formData);
+            if (result.error) {
+              await queueLogo();
+              setError(`Logo conservé localement; synchronisation différée. ${result.error}`);
+            } else if ((result as { logoUrl?: string }).logoUrl) {
+              if (company) {
+                setCompany({
+                  ...company,
+                  logo_url: (result as { logoUrl?: string }).logoUrl!,
+                });
+              }
+            }
+          } catch (uploadError) {
+            console.error("Échec de synchronisation du logo:", uploadError);
+            try {
+              await queueLogo();
+              setError("Logo enregistré localement; synchronisation différée.");
+            } catch (queueError) {
+              console.error("Échec de mise en file du logo:", queueError);
+              setError("Le logo n'a pas pu être enregistré pour synchronisation.");
             }
           }
-        } catch {
-          // Hors-ligne / réseau instable
-        }
+          setSuccess(true);
+          setTimeout(() => setSuccess(false), 3000);
+        });
+      } else {
+        await queueLogo();
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
-      });
-    } else {
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (fileError) {
+      console.error("Échec de l'enregistrement local du logo:", fileError);
+      setError(
+        fileError instanceof Error ? fileError.message : "Impossible d'enregistrer ce logo."
+      );
     }
   };
 

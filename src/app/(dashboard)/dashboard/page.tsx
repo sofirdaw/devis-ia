@@ -6,15 +6,11 @@
  */
 
 import { redirect } from "next/navigation";
-import { FileText, Receipt, TrendingUp, AlertTriangle } from "lucide-react";
 import { Header } from "@/components/layout";
-import { StatCard } from "@/components/dashboard/StatCard";
-import { RevenueChart } from "@/components/dashboard/RevenueChart";
-import { RecentDocumentsList } from "@/components/dashboard/RecentDocumentsList";
+import { DashboardActivity } from "@/components/dashboard/DashboardActivity";
 import { getDashboardStats } from "@/app/actions/dashboard";
 import { requireCurrentCompany } from "@/lib/current-company";
 import { getRemainingTrialDays, PLANS } from "@/lib/subscription";
-import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -65,68 +61,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {/* ── Cartes de statistiques ───────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard
-            label="Devis ce mois"
-            value={String(stats?.quotesCount ?? 0)}
-            icon={FileText}
-            tone="blue"
-          />
-          <StatCard
-            label="Factures ce mois"
-            value={String(stats?.invoicesCount ?? 0)}
-            icon={Receipt}
-            tone="blue"
-          />
-          <StatCard
-            label="Chiffre d'affaires"
-            value={formatCurrency(stats?.totalRevenue ?? 0)}
-            icon={TrendingUp}
-            tone="green"
-            subtext="Factures payées"
-          />
-          <StatCard
-            label="Factures impayées"
-            value={formatCurrency(stats?.unpaidAmount ?? 0)}
-            icon={AlertTriangle}
-            tone="orange"
-            subtext={`${stats?.unpaidCount ?? 0} facture${(stats?.unpaidCount ?? 0) > 1 ? "s" : ""}`}
-          />
-        </div>
-
-        {/* ── Graphique de revenus ────────────────────────────────────────── */}
-        <RevenueChart data={stats?.monthlyRevenue ?? []} />
-
-        {/* ── Listes récentes ───────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          <RecentDocumentsList
-            title="Derniers devis"
-            documents={(stats?.recentQuotes ?? []).map((q) => ({
-              id: q.id,
-              number: q.quote_number,
-              total: q.total,
-              status: q.status,
-              created_at: q.created_at,
-              client_name: q.client_name,
-            }))}
-            basePath="quotes"
-            viewAllHref="/quotes"
-          />
-          <RecentDocumentsList
-            title="Dernières factures"
-            documents={(stats?.recentInvoices ?? []).map((inv) => ({
-              id: inv.id,
-              number: inv.invoice_number,
-              total: inv.total,
-              status: inv.status,
-              created_at: inv.created_at,
-              client_name: inv.client_name,
-            }))}
-            basePath="invoices"
-            viewAllHref="/invoices"
-          />
-        </div>
+        <DashboardActivity initialStats={stats} companyId={company.id} />
       </div>
     </>
   );

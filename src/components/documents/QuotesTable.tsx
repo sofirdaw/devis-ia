@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getOfflineQuotes, type OfflineQuote } from "@/lib/offline-db";
 import type { Quote, QuoteStatus } from "@/types";
+import { useAuthStore } from "@/store/auth.store";
 
 interface QuotesTableProps {
   quotes: Quote[];
@@ -24,38 +25,53 @@ const STATUS_FILTERS: { value: QuoteStatus | "all"; label: string }[] = [
   { value: "sent", label: "Envoyés" },
   { value: "accepted", label: "Acceptés" },
   { value: "refused", label: "Refusés" },
+  { value: "expired", label: "Expirés" },
 ];
 
 export function QuotesTable({ quotes }: QuotesTableProps) {
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [offlineQuotes, setOfflineQuotes] = useState<OfflineQuote[]>([]);
+  const companyId = useAuthStore((state) => state.company?.id);
 
   useEffect(() => {
-    async function loadOffline() {
+    const loadOffline = async () => {
       const offline = await getOfflineQuotes();
-      setOfflineQuotes(offline);
-    }
+      setOfflineQuotes(offline.filter((quote) => quote.company_id === companyId));
+    };
     loadOffline();
 
     const handleSyncComplete = () => {
       loadOffline();
     };
 
+    window.addEventListener("pwa-offline-data-changed", loadOffline);
     window.addEventListener("pwa-sync-complete", handleSyncComplete);
-    return () => window.removeEventListener("pwa-sync-complete", handleSyncComplete);
-  }, []);
+    return () => {
+      window.removeEventListener("pwa-offline-data-changed", loadOffline);
+      window.removeEventListener("pwa-sync-complete", handleSyncComplete);
+    };
+  }, [companyId]);
 
   const combinedQuotes = useMemo(() => {
+    const serverIds = new Set(quotes.map((quote) => quote.id));
     const formattedOffline: Quote[] = offlineQuotes
-      .filter((off) => off.sync_status === "pending_create")
+      .filter(
+        (off) =>
+          !serverIds.has(off.id) ||
+          off.sync_status === "pending_create" ||
+          off.sync_status === "pending_update"
+      )
       .map(
         (off) =>
           ({
             id: off.id,
-            quote_number: `${off.quote_number} (Local 🟡)`,
+            quote_number:
+              off.sync_status === "pending_create"
+                ? `${off.quote_number} (Local 🟡)`
+                : off.quote_number,
             client: { name: off.client_name || "Client Local" },
-            status: off.status,
+            status: off.status === "rejected" ? "refused" : off.status,
             total: off.total,
             company_id: "offline_company",
             client_id: off.client_id || "",
@@ -63,12 +79,18 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
             tax: off.tax,
             discount: off.discount,
             notes: off.notes || "",
-            valid_until: null,
+            valid_until: off.valid_until ?? null,
             created_at: off.created_at,
-            is_offline: true,
-          }) as unknown as Quote
+            quote_items: off.items.map((item, index) => ({
+              ...item,
+              quote_id: off.id,
+              product_id: null,
+              id: `${off.id}-${index}`,
+            })),
+          }) as Quote
       );
-    return [...formattedOffline, ...quotes];
+    const localIds = new Set(formattedOffline.map((quote) => quote.id));
+    return [...formattedOffline, ...quotes.filter((quote) => !localIds.has(quote.id))];
   }, [quotes, offlineQuotes]);
 
   // KPIs

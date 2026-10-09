@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS quotes (
   client_id     UUID NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
   quote_number  TEXT NOT NULL,
   status        TEXT NOT NULL DEFAULT 'draft'
-                CHECK (status IN ('draft','sent','accepted','refused')),
+                CHECK (status IN ('draft','sent','accepted','refused','expired','cancelled')),
   subtotal      NUMERIC(12,2) NOT NULL DEFAULT 0,
   tax           NUMERIC(12,2) NOT NULL DEFAULT 0,
   discount      NUMERIC(12,2) NOT NULL DEFAULT 0,
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   quote_id        UUID REFERENCES quotes(id) ON DELETE SET NULL,
   invoice_number  TEXT NOT NULL,
   status          TEXT NOT NULL DEFAULT 'draft'
-                  CHECK (status IN ('draft','sent','paid','overdue')),
+                  CHECK (status IN ('draft','sent','paid','overdue','cancelled')),
   subtotal        NUMERIC(12,2) NOT NULL DEFAULT 0,
   tax             NUMERIC(12,2) NOT NULL DEFAULT 0,
   discount        NUMERIC(12,2) NOT NULL DEFAULT 0,

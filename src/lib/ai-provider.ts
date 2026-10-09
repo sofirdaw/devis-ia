@@ -31,6 +31,22 @@ export type AIFallbackResponse = {
   error?: string;
 };
 
+function isAIExtractionPayload(value: unknown): value is AIExtractionPayload {
+  if (typeof value !== "object" || value === null) return false;
+  const payload = value as Record<string, unknown>;
+  if (typeof payload.client_name !== "string" || !Array.isArray(payload.items)) return false;
+
+  return payload.items.every((item) => {
+    if (typeof item !== "object" || item === null) return false;
+    const candidate = item as Record<string, unknown>;
+    return (
+      typeof candidate.designation === "string" &&
+      (typeof candidate.quantity === "number" || typeof candidate.quantity === "string") &&
+      (typeof candidate.unit_price === "number" || typeof candidate.unit_price === "string")
+    );
+  });
+}
+
 interface ProviderTarget {
   name: string;
   baseURL?: string;
@@ -270,7 +286,10 @@ async function executeWithWaterfall(
           .trim();
       }
 
-      const parsedData = JSON.parse(jsonString) as AIExtractionPayload;
+      const parsedData: unknown = JSON.parse(jsonString);
+      if (!isAIExtractionPayload(parsedData)) {
+        throw new Error("Réponse IA incompatible avec le format attendu");
+      }
 
       console.log(`[AI Multi-Relais] ✅ Succès avec : ${target.name}`);
       return {
@@ -315,7 +334,9 @@ Réponds UNIQUEMENT avec ce format JSON exact, sans aucun texte autour :
 Description de l'utilisateur :
 """
 ${description}
-"""`;
+"""
+
+N'invente jamais un nom de client, un article, une quantité ou un prix. Si le nom d'un article ou son prix est absent ou ambigu, ne l'ajoute pas aux lignes. Retourne une liste "items" vide si aucune ligne complète et exploitable ne peut être extraite.`;
 
   return executeWithWaterfall(targets, systemPrompt, userContent);
 }
@@ -338,11 +359,13 @@ Analyse minutieusement cette image et extrais uniquement les données utiles :
 2. "items" : la liste de tous les articles/prestations trouvés :
    - "designation" : UNIQUEMENT et STRICTEMENT le nom de l'article ou de la prestation (ex: "Powerbank", "Sac", "Installation caméra"). Ne JAMAIS inclure de phrase d'instruction, d'en-têtes de tableau (ex: "Quantité", "Total"), ni de texte de copyright/bruit OCR.
    - "quantity" : quantité numérique entière (1 par défaut si non spécifié).
-   - "unit_price" : prix unitaire numérique en FCFA (sans symbole monétaire, ex: 15000, 20000).
+   - "unit_price" : prix unitaire numérique en FCFA (sans symbole monétaire, ex: 15000, 20000). Le prix doit être lu sur l'image ou retrouvé dans le catalogue fourni.
 3. "notes" : notes explicatives ou conditions particulières visibles.
 4. "date" : date au format YYYY-MM-DD (ou "${todayDate}" si absente).
 
 Ignore tout bruit OCR, logo ou ligne de titre générique.
+Pour chaque ligne, distingue la quantité, le prix unitaire et le total de ligne. Si seul le total de ligne est lisible et la quantité est connue, calcule le prix unitaire uniquement si le total est divisible sans ambiguïté par la quantité. Si la quantité est absente, utilise 1 et traite le montant lisible comme le prix unitaire. Ne place jamais le texte complet du document, le nom du client ou une instruction dans "designation".
+N'invente jamais un nom, un prix ou une quantité. Si un prix est illisible et absent du catalogue, ne retourne pas cette ligne. Si aucune ligne complète n'est lisible, retourne "items": [].
 
 Réponds STRICTEMENT avec ce format JSON valide, sans aucun texte autour :
 {

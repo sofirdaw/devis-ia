@@ -1,6 +1,5 @@
 export function shouldKeepAppLocal({
   online = true,
-  standalone = false,
 }: {
   online?: boolean;
   standalone?: boolean;
@@ -10,7 +9,6 @@ export function shouldKeepAppLocal({
 
 export function shouldRedirectAfterLogout({
   online = true,
-  standalone = false,
 }: {
   online?: boolean;
   standalone?: boolean;
@@ -25,7 +23,7 @@ export function shouldAllowOfflineNavigation({
   online?: boolean;
   standalone?: boolean;
 } = {}) {
-  return !online || standalone || true;
+  return !online || standalone;
 }
 
 export function shouldBlockNetworkActions({
@@ -35,6 +33,28 @@ export function shouldBlockNetworkActions({
   online?: boolean;
   action?: string;
 } = {}) {
-  if (!online) return false;
-  return action === "sync" ? false : false;
+  if (online) return false;
+  return ["ai", "payment", "subscription", "sync"].includes(action);
+}
+
+export function hasOfflineSubscriptionAccess(
+  subscription: {
+    status?: string | null;
+    expiresAt?: string | null;
+    trialEndsAt?: string | null;
+  },
+  now = new Date()
+): boolean {
+  if (subscription.status === "suspended") return false;
+
+  const expiry =
+    subscription.status === "active"
+      ? subscription.expiresAt
+      : subscription.status === "trial"
+        ? subscription.trialEndsAt
+        : null;
+
+  if (!expiry) return false;
+  const expiryTime = new Date(expiry).getTime();
+  return Number.isFinite(expiryTime) && expiryTime > now.getTime();
 }

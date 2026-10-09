@@ -9,7 +9,7 @@ import { useState, useRef, type DragEvent } from "react";
 import { Camera, Upload, X, FileImage } from "lucide-react";
 
 interface ImageUploadZoneProps {
-  onImageReady: (base64: string) => void;
+  onImageReady: (base64: string | null) => void;
   disabled?: boolean;
 }
 
@@ -68,27 +68,26 @@ export function ImageUploadZone({ onImageReady, disabled }: ImageUploadZoneProps
   const [preview, setPreview] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processFile = async (file: File) => {
-    if (!file.type.startsWith("image/")) return;
+    if (disabled || isProcessing) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Veuillez sélectionner une image JPG, PNG ou WebP.");
+      return;
+    }
 
     try {
       setIsProcessing(true);
+      setError(null);
       // Compression et optimisation automatique
       const optimizedBase64 = await optimizeImageForOCR(file, 1400, 0.88);
       setPreview(optimizedBase64);
       onImageReady(optimizedBase64);
     } catch (err) {
       console.error("Erreur optimisation image:", err);
-      // Fallback vers lecture directe
-      const reader = new FileReader();
-      reader.onload = () => {
-        const rawBase64 = reader.result as string;
-        setPreview(rawBase64);
-        onImageReady(rawBase64);
-      };
-      reader.readAsDataURL(file);
+      setError("Impossible de lire cette image. Essayez un autre fichier.");
     } finally {
       setIsProcessing(false);
     }
@@ -113,7 +112,12 @@ export function ImageUploadZone({ onImageReady, disabled }: ImageUploadZoneProps
         <img src={preview} alt="Aperçu du document" className="w-full max-h-80 object-contain" />
         {!disabled && (
           <button
-            onClick={clearImage}
+            type="button"
+            onClick={() => {
+              clearImage();
+              onImageReady(null);
+              setError(null);
+            }}
             className="absolute top-2 right-2 bg-white/90 hover:bg-white p-2.5 rounded-full shadow-md transition-colors"
             aria-label="Retirer l'image"
           >
@@ -164,6 +168,11 @@ export function ImageUploadZone({ onImageReady, disabled }: ImageUploadZoneProps
       <p className="text-xs text-gray-500 mt-1.5 max-w-sm mx-auto">
         Facture papier, note manuscrite, bon de commande, devis rédigé à la main... — JPG, PNG
       </p>
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-red-600">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

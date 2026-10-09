@@ -7,41 +7,25 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-const FETCH_TIMEOUT_MS = 60_000;
-const MAX_RETRIES = 2;
-const RETRY_DELAY_MS = 500;
+const READ_TIMEOUT_MS = 8_000;
+const WRITE_TIMEOUT_MS = 60_000;
+const MAX_RETRIES = 1;
+const RETRY_DELAY_MS = 250;
 
 /**
- * Détermine si une erreur réseau (fetch) mérite une nouvelle tentative.
- *
- * Node enveloppe les erreurs bas niveau (ex: ConnectTimeoutError d'undici)
- * dans un `TypeError: fetch failed` dont le message ne contient jamais le
- * mot "timeout" — la vraie cause se trouve dans `error.cause`. C'est pour
- * cette raison qu'un simple `error.message.includes("timeout")` ne
- * déclenchait jamais la relance.
+ * Retry only connection resets; timeouts and unreachable hosts should fail
+ * promptly so server-rendered pages can use their offline fallbacks.
  */
 function isRetryableNetworkError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
 
   const cause = (error as Error & { cause?: unknown }).cause;
-  const messages = [error.message, cause instanceof Error ? cause.message : ""]
-    .join(" ")
-    .toLowerCase();
-
   const code =
     cause && typeof cause === "object" && "code" in cause
       ? String((cause as { code?: unknown }).code)
       : "";
 
-  return (
-    messages.includes("timeout") ||
-    messages.includes("fetch failed") ||
-    messages.includes("econnreset") ||
-    messages.includes("network") ||
-    code === "UND_ERR_CONNECT_TIMEOUT" ||
-    code === "ECONNRESET" ||
-    code === "ETIMEDOUT"
-  );
+  return code === "ECONNRESET" || code === "EPIPE";
 }
 
 async function fetchWithRetry(
@@ -49,10 +33,16 @@ async function fetchWithRetry(
   options: RequestInit = {},
   attempt = 1
 ): Promise<Response> {
+  const method = (options.method ?? (url instanceof Request ? url.method : "GET")).toUpperCase();
+  const requestUrl = url instanceof Request ? url.url : String(url);
+  const isAuthRequest = requestUrl.includes("/auth/v1/");
+  const timeout =
+    isAuthRequest || method === "GET" || method === "HEAD" ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS;
+
   try {
     return await fetch(url, {
       ...options,
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeout),
     });
   } catch (error) {
     console.error(`Supabase fetch error (attempt ${attempt}/${MAX_RETRIES + 1}):`, error);

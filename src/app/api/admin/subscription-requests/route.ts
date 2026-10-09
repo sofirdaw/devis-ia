@@ -1,10 +1,28 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PLANS, type PlanId } from "@/lib/subscription";
 import { isCurrentUserAdmin } from "@/lib/admin-access";
 import { companyCacheKey, dashboardCacheKey, invalidateCache } from "@/lib/cache";
 
 export const runtime = "nodejs";
+
+type ManualPaymentApproval = {
+  approved_company_id: string;
+  approved_user_id: string;
+  subscription_expires_at: string | null;
+  already_activated: boolean;
+};
+
+function isManualPaymentApproval(value: unknown): value is ManualPaymentApproval {
+  if (typeof value !== "object" || value === null) return false;
+  const result = value as Record<string, unknown>;
+  return (
+    typeof result.approved_company_id === "string" &&
+    typeof result.approved_user_id === "string" &&
+    (typeof result.subscription_expires_at === "string" ||
+      result.subscription_expires_at === null) &&
+    typeof result.already_activated === "boolean"
+  );
+}
 
 export async function GET() {
   if (!(await isCurrentUserAdmin()))
@@ -44,80 +62,29 @@ export async function POST(request: Request) {
   if (!requestId) return NextResponse.json({ error: "Demande invalide." }, { status: 400 });
 
   const supabase = createAdminClient();
-  const { data: payment, error: paymentError } = await supabase
-    .from("subscription_payments")
-    .select("id, company_id, plan, amount, status, user_confirmed_at, payment_request_expires_at")
-    .eq("id", requestId)
-    .eq("status", "pending")
+  const { data: approval, error } = await supabase
+    .rpc("approve_manual_subscription_payment", { p_payment_id: requestId })
     .single();
-  if (paymentError || !payment)
-    return NextResponse.json({ error: "Demande introuvable ou déjà traitée." }, { status: 404 });
-  if (!payment.user_confirmed_at)
-    return NextResponse.json(
-      { error: "L'utilisateur n'a pas encore confirmé son paiement." },
-      { status: 409 }
+
+  if (error || !isManualPaymentApproval(approval)) {
+    const status = error?.code === "P0002" ? 404 : error?.code === "P0001" ? 409 : 500;
+    const message =
+      error?.message === "Cette demande a expiré."
+        ? error.message
+        : error?.message || "Activation impossible.";
+    return NextResponse.json({ error: message }, { status });
+  }
+
+  if (!approval.already_activated) {
+    await invalidateCache(
+      companyCacheKey(approval.approved_user_id),
+      dashboardCacheKey(approval.approved_company_id)
     );
-  if (
-    payment.payment_request_expires_at &&
-    new Date(payment.payment_request_expires_at) <= new Date()
-  )
-    return NextResponse.json({ error: "Cette demande a expiré." }, { status: 410 });
+  }
 
-  const plan = payment.plan as PlanId;
-  if (!(plan in PLANS)) return NextResponse.json({ error: "Forfait invalide." }, { status: 400 });
-
-  const now = new Date();
-  const currentCompany = await supabase
-    .from("companies")
-    .select("user_id, subscription_expires_at")
-    .eq("id", payment.company_id)
-    .single();
-  if (currentCompany.error || !currentCompany.data)
-    return NextResponse.json({ error: "Entreprise introuvable." }, { status: 404 });
-  const currentExpiry = currentCompany.data.subscription_expires_at
-    ? new Date(currentCompany.data.subscription_expires_at)
-    : now;
-  const startsAt = currentExpiry > now ? currentExpiry : now;
-  const expiresAt = new Date(startsAt);
-  if (plan === "monthly") expiresAt.setMonth(expiresAt.getMonth() + 1);
-  if (plan === "quarter") expiresAt.setMonth(expiresAt.getMonth() + 3);
-  if (plan === "year") expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-
-  const { error: updatePaymentError } = await supabase
-    .from("subscription_payments")
-    .update({
-      status: "paid",
-      paid_at: now.toISOString(),
-      activated_at: now.toISOString(),
-    })
-    .eq("id", payment.id)
-    .eq("status", "pending");
-  if (updatePaymentError)
-    return NextResponse.json({ error: updatePaymentError.message }, { status: 500 });
-
-  const { error: companyUpdateError } = await supabase
-    .from("companies")
-    .update({
-      subscription_plan: plan,
-      subscription_status: "active",
-      subscription_started_at: startsAt.toISOString(),
-      subscription_expires_at: expiresAt.toISOString(),
-    })
-    .eq("id", payment.company_id);
-  if (companyUpdateError)
-    return NextResponse.json({ error: companyUpdateError.message }, { status: 500 });
-
-  const { error: activationError } = await supabase.from("subscription_activations").insert({
-    payment_id: payment.id,
-    company_id: payment.company_id,
-    plan,
+  return NextResponse.json({
+    success: true,
+    alreadyActivated: approval.already_activated,
+    expiresAt: approval.subscription_expires_at,
   });
-  if (activationError)
-    return NextResponse.json({ error: activationError.message }, { status: 500 });
-
-  await invalidateCache(
-    companyCacheKey(currentCompany.data.user_id),
-    dashboardCacheKey(payment.company_id)
-  );
-  return NextResponse.json({ success: true, expiresAt: expiresAt.toISOString() });
 }

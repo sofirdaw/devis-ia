@@ -59,6 +59,17 @@ describe("Moteur de Parsing Hors-Ligne (NLP Heuristique)", () => {
     expect(result.error).toBeDefined();
   });
 
+  it("refuse de générer un article à zéro lorsqu'aucun prix n'est fourni", () => {
+    const result = parseDocumentOfflineText(
+      "Crée-moi une facture pour achat de ça",
+      mockClients,
+      mockProducts
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.data?.items).toBeUndefined();
+  });
+
   it("extrait un devis avec plusieurs articles", () => {
     const input = "Facture pour Ibrahim, 3 HP EliteBook à 250000 et 1 souris à 5000";
     const result = parseDocumentOfflineText(input, mockClients, mockProducts);
@@ -120,5 +131,28 @@ Livre
     expect(result.data?.items[1].designation).toBe("Livre");
     expect(result.data?.items[1].quantity).toBe(1);
     expect(result.data?.items[1].unit_price).toBe(2000);
+  });
+
+  it("extrait le client et chaque article avec sa quantité et son prix depuis une note manuscrite transcrite", () => {
+    const input =
+      "Facture pour Awa Traoré : 2 ordinateurs à 250000 FCFA chacun, et une installation réseau à 35000 FCFA";
+    const result = parseDocumentOfflineText(input, [], []);
+
+    expect(result.success).toBe(true);
+    expect(result.data?.clientName).toBe("Awa Traoré");
+    expect(result.data?.items).toEqual([
+      {
+        product_id: null,
+        designation: "Ordinateurs",
+        quantity: 2,
+        unit_price: 250000,
+      },
+      {
+        product_id: null,
+        designation: "Installation réseau",
+        quantity: 1,
+        unit_price: 35000,
+      },
+    ]);
   });
 });

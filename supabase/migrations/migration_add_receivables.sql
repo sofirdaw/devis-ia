@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS receivables (
   paid_amount     NUMERIC(12,2) NOT NULL DEFAULT 0,
   remaining_amount NUMERIC(12,2) NOT NULL GENERATED ALWAYS AS (total_amount - paid_amount) STORED,
   status          TEXT NOT NULL DEFAULT 'pending'
-                  CHECK (status IN ('pending', 'partial', 'paid', 'overdue')),
+                  CHECK (status IN ('pending', 'partial', 'paid', 'overdue', 'cancelled')),
   due_date        DATE,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),

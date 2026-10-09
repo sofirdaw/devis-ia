@@ -1,4 +1,4 @@
-const CACHE_NAME = "devis-ia-v10";
+const CACHE_NAME = "devis-ia-v16";
 
 const STATIC_ASSETS = [
   "/offline.html",
@@ -7,7 +7,34 @@ const STATIC_ASSETS = [
   "/icons/icon-512x512.png",
   "/icons/apple-touch-icon.png",
   "/icons/icon-maskable-512x512.png",
+  "/ocr/worker.min.js",
+  "/ocr/tesseract-core-lstm.wasm.js",
+  "/ocr/tesseract-core-lstm.wasm",
+  "/ocr/fra.traineddata.gz",
 ];
+
+function rscCacheKey(request) {
+  const requestUrl = new URL(request.url);
+  requestUrl.searchParams.delete("_rsc");
+
+  const routingHeaders = [
+    "RSC",
+    "Next-Url",
+    "Next-Router-State-Tree",
+    "Next-Router-Prefetch",
+    "Next-Router-Segment-Prefetch",
+  ];
+  const routingState = routingHeaders
+    .map((name) => `${name}:${request.headers.get(name) ?? ""}`)
+    .join("|");
+  let hash = 2166136261;
+  for (let index = 0; index < routingState.length; index++) {
+    hash ^= routingState.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  requestUrl.searchParams.set("__offline_rsc", (hash >>> 0).toString(16));
+  return new Request(requestUrl, { method: "GET" });
+}
 
 // Installation et pré-chargement des ressources statiques critiques
 self.addEventListener("install", (event) => {
@@ -20,9 +47,11 @@ self.addEventListener("install", (event) => {
             const res = await fetch(url);
             if (res && res.status === 200) {
               await cache.put(url, res);
+            } else {
+              console.warn("[SW] Impossible de précacher la ressource :", url, res?.status);
             }
-          } catch {
-            // Ignorer silencieusement si un asset n'est pas encore disponible
+          } catch (error) {
+            console.warn("[SW] Échec du précache :", url, error);
           }
         })
       );
@@ -37,7 +66,7 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
+          if (cache.startsWith("devis-ia-") && cache !== CACHE_NAME) {
             console.log("[SW] Suppression de l'ancien cache :", cache);
             return caches.delete(cache);
           }
@@ -62,85 +91,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Interception des requêtes POST (Server Actions) en cas de perte de connexion
-  if (event.request.method === "POST") {
-    // Tenter d'envoyer au réseau ; en cas d'échec, stocker la requête
-    // dans IndexedDB (sync_queue) pour que le client la synchronise plus tard.
-    event.respondWith(
-      (async () => {
-        try {
-          const networkResponse = await fetch(event.request.clone());
-          return networkResponse;
-        } catch (err) {
-          try {
-            // Lire le corps de la requête (JSON ou texte)
-            let body = null;
-            try {
-              body = await event.request.clone().json();
-            } catch (e) {
-              try {
-                body = await event.request.clone().text();
-              } catch (ee) {
-                body = null;
-              }
-            }
+  // Never fabricate success for a failed mutation. Offline writes must be
+  // persisted by the explicit IndexedDB form handlers and replayed by the app.
+  if (event.request.method !== "GET") return;
 
-            // Stocker dans IndexedDB sync_queue pour la reprise côté client
-            await (async function addToSyncQueue(payload) {
-              return new Promise((resolve) => {
-                const req = indexedDB.open("DevisIA_OfflineDB", 4);
-                req.onsuccess = function () {
-                  const db = req.result;
-                  const tx = db.transaction("sync_queue", "readwrite");
-                  const store = tx.objectStore("sync_queue");
-                  const item = {
-                    id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                    action: payload.action || "CREATE_QUOTE",
-                    payload: payload.body ?? {},
-                    created_at: new Date().toISOString(),
-                  };
-                  store.put(item);
-                  tx.oncomplete = () => resolve(true);
-                  tx.onerror = () => resolve(false);
-                };
-                req.onerror = () => resolve(false);
-              });
-            })({
-              action: (function guessAction(url) {
-                if (url.includes("/quotes")) return "CREATE_QUOTE";
-                if (url.includes("/invoices")) return "CREATE_INVOICE";
-                return "CREATE_QUOTE";
-              })(event.request.url),
-              body,
-            });
-            // Tenter d'enregistrer un Background Sync pour que le SW tente
-            // d'appeler l'événement 'sync' lorsque la connectivité revient.
-            try {
-              if (self.registration && self.registration.sync) {
-                await self.registration.sync.register('devisia-sync');
-              }
-            } catch (e) {
-              // Certains navigateurs ne supportent pas SyncManager; OK.
-            }
-          } catch (dbErr) {
-            // Silent fail
-            console.warn("SW: impossible d'écrire la sync_queue :", dbErr);
-          }
-
-          // Répondre immédiatement côté client pour conserver l'UX en offline
-          return new Response(JSON.stringify({ success: true, offline: true }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-      })()
-    );
-    return;
-  }
-
-  // 1. Assets Statiques (JS, CSS, Polices, Images, Icônes) -> Cache-First avec revalidation en arrière-plan
+  // Keep the network authoritative while online; only use cached assets if
+  // the request fails so an old bundle cannot freeze an updated application.
   const isStaticAsset =
     url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/ocr/") ||
     url.pathname.startsWith("/icons/") ||
     url.pathname.endsWith(".ico") ||
     url.pathname.endsWith(".png") ||
@@ -151,31 +110,26 @@ self.addEventListener("fetch", (event) => {
 
   if (isStaticAsset) {
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        if (cachedResponse) {
-          // Revalider en arrière-plan
-          fetch(event.request)
-            .then((networkResponse) => {
-              if (networkResponse && networkResponse.status === 200) {
-                caches.open(CACHE_NAME).then((cache) => {
-                  cache.put(event.request, networkResponse);
-                });
-              }
-            })
-            .catch(() => {});
-          return cachedResponse;
+      (async () => {
+        let networkResponse;
+        try {
+          networkResponse = await fetch(event.request);
+        } catch (error) {
+          const cachedResponse = await caches.match(event.request);
+          if (cachedResponse) return cachedResponse;
+          throw error;
         }
 
-        return fetch(event.request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
+        if (networkResponse.status === 200) {
+          try {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(event.request, networkResponse.clone());
+          } catch (error) {
+            console.warn("[SW] Échec du cache de la ressource:", error);
           }
-          return networkResponse;
-        });
-      })
+        }
+        return networkResponse;
+      })()
     );
     return;
   }
@@ -187,60 +141,47 @@ self.addEventListener("fetch", (event) => {
     event.request.headers.get("Next-Router-Prefetch") === "1";
 
   if (isRSCRequest) {
+    const cacheKey = rscCacheKey(event.request);
     event.respondWith(
       (async () => {
+        let networkResponse;
         try {
-          const networkResponse = await fetch(event.request);
-          if (networkResponse && networkResponse.status === 200) {
-            const responseToCache = networkResponse.clone();
-            const cache = await caches.open(CACHE_NAME);
-            await cache.put(event.request, responseToCache);
-          }
-          return networkResponse;
+          networkResponse = await fetch(event.request);
         } catch {
-          const cached = await caches.match(event.request);
+          const cached = await caches.match(cacheKey);
           if (cached) return cached;
-
-          const cachedBase = await caches.match(url.pathname);
-          if (cachedBase) return cachedBase;
-
           return new Response(null, { status: 503, statusText: "Offline" });
         }
+
+        if (networkResponse.status === 200) {
+          try {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(cacheKey, networkResponse.clone());
+          } catch (error) {
+            console.warn("[SW] Échec du cache de la page:", error);
+          }
+        }
+        return networkResponse;
       })()
     );
     return;
   }
 
-  // 3. Navigation de pages HTML -> Network First avec fallback propre
-  if (event.request.mode === "navigate") {
+  // 3. Navigation de pages HTML and explicit HTML prefetch -> Network First.
+  const requestsHtml =
+    event.request.mode === "navigate" ||
+    event.request.headers.get("Accept")?.includes("text/html");
+
+  if (requestsHtml) {
     event.respondWith(
       (async () => {
+        let networkResponse;
         try {
-          const networkResponse = await fetch(event.request, { cache: "no-store" });
-
-          if (networkResponse && networkResponse.ok && !networkResponse.redirected) {
-            const responseToCache = networkResponse.clone();
-            const cache = await caches.open(CACHE_NAME);
-            await cache.put(event.request, responseToCache);
-            await cache.put(url.pathname, responseToCache.clone());
-          }
-
-          return networkResponse;
+          networkResponse = await fetch(event.request);
         } catch {
           const cached =
             (await caches.match(event.request)) || (await caches.match(url.pathname));
           if (cached) return cached;
-
-          const fallback =
-            (await caches.match("/dashboard")) ||
-            (await caches.match("/quotes")) ||
-            (await caches.match("/invoices")) ||
-            (await caches.match("/products")) ||
-            (await caches.match("/clients")) ||
-            (await caches.match("/settings")) ||
-            (await caches.match("/login"));
-
-          if (fallback) return fallback;
 
           const offlinePage = await caches.match("/offline.html");
           if (offlinePage) return offlinePage;
@@ -252,6 +193,17 @@ self.addEventListener("fetch", (event) => {
             });
           });
         }
+
+        if (networkResponse.status === 200 && !networkResponse.redirected) {
+          try {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(event.request, networkResponse.clone());
+            await cache.put(url.pathname, networkResponse.clone());
+          } catch (error) {
+            console.warn("[SW] Échec du cache de la page:", error);
+          }
+        }
+        return networkResponse;
       })()
     );
     return;
@@ -276,7 +228,7 @@ self.addEventListener("fetch", (event) => {
             // Optionnel: tenter un replay côté SW en lisant la sync_queue
             // pour les environnements qui préfèrent que le SW fasse le travail.
             try {
-              const req = indexedDB.open('DevisIA_OfflineDB', 4);
+              const req = indexedDB.open('DevisIA_OfflineDB', 5);
               req.onsuccess = function () {
                 const db = req.result;
                 const tx = db.transaction('sync_queue', 'readonly');

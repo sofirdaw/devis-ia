@@ -14,6 +14,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { calculateTotals } from "@/lib/utils";
+import { dashboardCacheKey, invalidateCache } from "@/lib/cache";
 import type { ActionResult } from "./auth";
 import type { QuoteStatus } from "@/types";
 
@@ -84,10 +85,52 @@ export async function createQuoteAction(
   const company = await getCurrentCompany();
   if (!company) return { error: "Entreprise introuvable" };
 
+  const offlineSyncIdValue = formData.get("offline_sync_id");
+  const offlineSyncId =
+    typeof offlineSyncIdValue === "string" &&
+    z.string().uuid().safeParse(offlineSyncIdValue).success
+      ? offlineSyncIdValue
+      : null;
+  if (offlineSyncIdValue && !offlineSyncId)
+    return { error: "Identifiant local de synchronisation invalide." };
+
   // Utiliser les notes par défaut si aucune note n'est fournie
   const notes = parsed.data.notes || company.default_quote_notes || null;
 
   const supabase = await createClient();
+  const repairExistingItems = async (quoteId: string) => {
+    const { error: deleteError } = await supabase
+      .from("quote_items")
+      .delete()
+      .eq("quote_id", quoteId);
+    if (deleteError) return false;
+    const itemsToInsert = parsed.data.items.map((item) => ({
+      quote_id: quoteId,
+      product_id: item.product_id || null,
+      designation: item.designation,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total: item.quantity * item.unit_price,
+    }));
+    const { error } = await supabase.from("quote_items").insert(itemsToInsert);
+    return !error;
+  };
+  if (offlineSyncId) {
+    const { data: existing, error: lookupError } = await supabase
+      .from("quotes")
+      .select("id")
+      .eq("id", offlineSyncId)
+      .eq("company_id", company.id)
+      .maybeSingle();
+    if (lookupError) return { error: "Impossible de vérifier le devis déjà synchronisé." };
+    if (existing) {
+      if (!(await repairExistingItems(existing.id))) {
+        return { error: "Impossible de terminer la synchronisation des lignes du devis." };
+      }
+      revalidatePath("/quotes");
+      if (formData.get("offline_sync_id")) return { success: true };
+    }
+  }
 
   // 1. Calculer les totaux
   const { subtotal, tax, total } = calculateTotals(
@@ -107,6 +150,7 @@ export async function createQuoteAction(
   const { data: quote, error: quoteError } = await supabase
     .from("quotes")
     .insert({
+      ...(offlineSyncId ? { id: offlineSyncId } : {}),
       company_id: company.id,
       client_id: parsed.data.client_id,
       quote_number: quoteNumber,
@@ -122,6 +166,20 @@ export async function createQuoteAction(
     .single();
 
   if (quoteError || !quote) {
+    if (offlineSyncId && quoteError?.code === "23505") {
+      const { data: existing } = await supabase
+        .from("quotes")
+        .select("id")
+        .eq("id", offlineSyncId)
+        .eq("company_id", company.id)
+        .maybeSingle();
+      if (existing) {
+        if (!(await repairExistingItems(existing.id))) {
+          return { error: "Impossible de terminer la synchronisation des lignes du devis." };
+        }
+        return { success: true };
+      }
+    }
     return { error: "Erreur lors de la création du devis" };
   }
 
@@ -144,6 +202,7 @@ export async function createQuoteAction(
   }
 
   revalidatePath("/quotes");
+  if (offlineSyncId) return { success: true };
   redirect(`/quotes/${quote.id}`);
 }
 
@@ -245,6 +304,7 @@ export async function updateQuoteAction(
 
   revalidatePath("/quotes");
   revalidatePath(`/quotes/${quoteId}`);
+  if (formData.get("offline_sync") === "true") return { success: true };
   redirect(`/quotes/${quoteId}`);
 }
 
@@ -254,11 +314,31 @@ export async function updateQuoteStatusAction(
   quoteId: string,
   status: QuoteStatus
 ): Promise<ActionResult> {
+  const company = await getCurrentCompany();
+  if (!company) return { error: "Entreprise introuvable" };
+
   const supabase = await createClient();
-  const { error } = await supabase.from("quotes").update({ status }).eq("id", quoteId);
+  const { data: existing, error: lookupError } = await supabase
+    .from("quotes")
+    .select("status")
+    .eq("id", quoteId)
+    .eq("company_id", company.id)
+    .maybeSingle();
+  if (lookupError || !existing) return { error: "Devis introuvable" };
+  if (existing.status === "cancelled" && status !== "cancelled") {
+    return { error: "Un devis annulé ne peut pas être réactivé." };
+  }
+
+  const { error } = await supabase
+    .from("quotes")
+    .update({ status })
+    .eq("id", quoteId)
+    .eq("company_id", company.id);
 
   if (error) return { error: "Erreur lors de la mise à jour du statut" };
 
+  await invalidateCache(dashboardCacheKey(company.id));
+  revalidatePath("/dashboard");
   revalidatePath("/quotes");
   revalidatePath(`/quotes/${quoteId}`);
   return { success: true };
@@ -296,6 +376,9 @@ export async function convertQuoteToInvoiceAction(quoteId: string): Promise<Acti
     .single();
 
   if (!quote) return { error: "Devis introuvable" };
+  if (quote.status !== "accepted") {
+    return { error: "Seuls les devis acceptés peuvent être convertis en facture." };
+  }
 
   // Générer le numéro de facture
   const { data: invoiceNumber } = await supabase.rpc("next_document_number", {

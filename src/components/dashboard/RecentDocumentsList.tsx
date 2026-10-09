@@ -14,6 +14,8 @@ interface RecentDoc {
   status: string;
   created_at: string;
   client_name: string;
+  paid_amount?: number;
+  remaining_amount?: number;
 }
 
 interface RecentDocumentsListProps {
@@ -51,13 +53,22 @@ export function RecentDocumentsList({
               <div className="min-w-0">
                 <p className="font-medium text-gray-900 font-mono text-xs">{doc.number}</p>
                 <p className="text-xs text-gray-500 truncate">{doc.client_name}</p>
+                {basePath === "invoices" &&
+                  doc.paid_amount !== undefined &&
+                  doc.remaining_amount !== undefined &&
+                  (doc.paid_amount > 0 || doc.status === "cancelled") && (
+                    <p className="mt-0.5 text-[11px] text-gray-500">
+                      Payé {formatCurrency(doc.paid_amount)} · Reste{" "}
+                      {formatCurrency(doc.remaining_amount)}
+                    </p>
+                  )}
               </div>
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 <span className="hidden md:inline text-xs text-gray-400">
                   {formatDate(doc.created_at)}
                 </span>
                 <StatusBadge status={doc.status} />
-                <span className="text-xs sm:text-sm font-medium text-gray-900 w-16 sm:w-24 text-right">
+                <span className="text-xs sm:text-sm font-medium text-gray-900 w-20 sm:w-28 text-right">
                   {formatCurrency(doc.total)}
                 </span>
               </div>

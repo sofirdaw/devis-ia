@@ -1,20 +1,27 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PLANS, type PlanId } from "@/lib/subscription";
 import { companyCacheKey, dashboardCacheKey, invalidateCache } from "@/lib/cache";
 
 export const runtime = "nodejs";
 
-function isPaidStatus(value: unknown) {
-  return ["paid", "successful", "success", "completed", "SUCCESS"].includes(String(value));
+type OrangePaymentActivation = {
+  activated_company_id: string;
+  activated_user_id: string;
+  already_activated: boolean;
+};
+
+function isOrangePaymentActivation(value: unknown): value is OrangePaymentActivation {
+  if (typeof value !== "object" || value === null) return false;
+  const activation = value as Record<string, unknown>;
+  return (
+    typeof activation.activated_company_id === "string" &&
+    typeof activation.activated_user_id === "string" &&
+    typeof activation.already_activated === "boolean"
+  );
 }
 
-function addPlanDuration(from: Date, plan: PlanId) {
-  const expires = new Date(from);
-  if (plan === "monthly") expires.setMonth(expires.getMonth() + 1);
-  if (plan === "quarter") expires.setMonth(expires.getMonth() + 3);
-  if (plan === "year") expires.setFullYear(expires.getFullYear() + 1);
-  return expires;
+function isPaidStatus(value: unknown) {
+  return ["paid", "successful", "success", "completed", "SUCCESS"].includes(String(value));
 }
 
 export async function POST(request: Request) {
@@ -32,58 +39,34 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAdminClient();
-    const { data: payment } = await supabase
-      .from("subscription_payments")
-      .select("id, company_id, plan, amount, status")
-      .eq("order_id", orderId)
-      .maybeSingle();
-    if (!payment) return NextResponse.json({ error: "Commande inconnue." }, { status: 404 });
-    if (payment.status === "paid") return NextResponse.json({ received: true });
-
     const paidAmount = Number(payload.amount);
-    if (!Number.isFinite(paidAmount) || paidAmount !== payment.amount) {
+    if (!Number.isSafeInteger(paidAmount) || paidAmount <= 0) {
       return NextResponse.json({ error: "Montant invalide." }, { status: 400 });
     }
 
-    const plan = payment.plan as PlanId;
-    if (!(plan in PLANS)) return NextResponse.json({ error: "Forfait invalide." }, { status: 400 });
-    const { data: company } = await supabase
-      .from("companies")
-      .select("user_id, subscription_expires_at")
-      .eq("id", payment.company_id)
+    const transactionId = String(payload.transaction_id || payload.transactionId || "");
+    const { data: activation, error } = await supabase
+      .rpc("activate_orange_subscription_payment", {
+        p_order_id: orderId,
+        p_transaction_id: transactionId,
+        p_paid_amount: paidAmount,
+      })
       .single();
-    const now = new Date();
-    const currentExpiry = company?.subscription_expires_at
-      ? new Date(company.subscription_expires_at)
-      : now;
-    const startsAt = currentExpiry > now ? currentExpiry : now;
-    const expiresAt = addPlanDuration(startsAt, plan);
+    if (error) {
+      if (error.code === "P0002")
+        return NextResponse.json({ error: "Commande inconnue." }, { status: 404 });
+      if (error.code === "P0001" || error.code === "22023")
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      throw error;
+    }
+    if (!isOrangePaymentActivation(activation)) {
+      throw new Error("Réponse d'activation Orange Money invalide.");
+    }
 
-    const { error } = await supabase
-      .from("subscription_payments")
-      .update({
-        status: "paid",
-        orange_transaction_id:
-          String(payload.transaction_id || payload.transactionId || "") || null,
-        paid_at: now.toISOString(),
-      })
-      .eq("id", payment.id);
-    if (error) throw error;
-
-    const { error: companyError } = await supabase
-      .from("companies")
-      .update({
-        subscription_plan: plan,
-        subscription_status: "active",
-        subscription_started_at: startsAt.toISOString(),
-        subscription_expires_at: expiresAt.toISOString(),
-      })
-      .eq("id", payment.company_id);
-    if (companyError) throw companyError;
-    if (company?.user_id)
+    if (!activation.already_activated)
       await invalidateCache(
-        companyCacheKey(company.user_id),
-        dashboardCacheKey(payment.company_id)
+        companyCacheKey(activation.activated_user_id),
+        dashboardCacheKey(activation.activated_company_id)
       );
 
     return NextResponse.json({ received: true });

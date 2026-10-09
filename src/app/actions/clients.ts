@@ -52,15 +52,31 @@ export async function createClientAction(
   const companyId = await getCurrentCompanyId();
   if (!companyId) return { error: "Entreprise introuvable" };
 
-  // En mode hors-ligne, on ne peut pas écrire dans Supabase — retour silencieux
-  if (companyId === OFFLINE_UUID) {
-    return {
-      error: "Impossible de créer un client hors-ligne. Reconnectez-vous pour synchroniser.",
-    };
-  }
+  const offlineSyncIdValue = formData.get("offline_sync_id");
+  const offlineSyncId =
+    typeof offlineSyncIdValue === "string" &&
+    z.string().uuid().safeParse(offlineSyncIdValue).success
+      ? offlineSyncIdValue
+      : null;
+  if (offlineSyncIdValue && !offlineSyncId)
+    return { error: "Identifiant local de synchronisation invalide." };
+  if (companyId === OFFLINE_UUID)
+    return { error: "Connexion requise pour synchroniser le client." };
 
   const supabase = await createClient();
+  if (offlineSyncId) {
+    const { data: existing, error: lookupError } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("id", offlineSyncId)
+      .eq("company_id", companyId)
+      .maybeSingle();
+    if (lookupError) return { error: "Impossible de vérifier le client déjà synchronisé." };
+    if (existing) return { success: true };
+  }
+
   const { error } = await supabase.from("clients").insert({
+    ...(offlineSyncId ? { id: offlineSyncId } : {}),
     company_id: companyId,
     name: parsed.data.name,
     phone: parsed.data.phone || null,
@@ -69,6 +85,15 @@ export async function createClientAction(
   });
 
   if (error) {
+    if (offlineSyncId && error.code === "23505") {
+      const { data: existing } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("id", offlineSyncId)
+        .eq("company_id", companyId)
+        .maybeSingle();
+      if (existing) return { success: true };
+    }
     console.error("Erreur Supabase création client:", error);
     return { error: `Erreur lors de la création du client: ${error.message}` };
   }

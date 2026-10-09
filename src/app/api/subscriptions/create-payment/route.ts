@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as { plan?: string };
     const plan = body.plan as PlanId;
-    if (!plan || !(plan in PLANS)) {
+    if (!plan || !Object.hasOwn(PLANS, plan)) {
       return NextResponse.json({ error: "Forfait invalide." }, { status: 400 });
     }
 
@@ -39,6 +39,15 @@ export async function POST(request: Request) {
       })
       .select("id")
       .single();
+    if (insertError?.code === "23505") {
+      return NextResponse.json(
+        {
+          error:
+            "Un paiement est déjà en cours pour votre entreprise. Terminez ou annulez cette demande avant d'en créer une autre.",
+        },
+        { status: 409 }
+      );
+    }
     if (insertError || !payment) throw new Error(insertError?.message || "Paiement non créé.");
 
     try {

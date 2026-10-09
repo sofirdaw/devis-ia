@@ -17,7 +17,8 @@ interface SpeechRecognitionResult {
   transcript: string;
 }
 interface SpeechRecognitionEvent extends Event {
-  results: { [index: number]: { [index: number]: SpeechRecognitionResult } };
+  resultIndex: number;
+  results: ArrayLike<{ isFinal: boolean; 0: SpeechRecognitionResult }>;
 }
 interface SpeechRecognitionInstance extends EventTarget {
   lang: string;
@@ -26,7 +27,7 @@ interface SpeechRecognitionInstance extends EventTarget {
   start: () => void;
   stop: () => void;
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: Event) => void) | null;
   onend: (() => void) | null;
 }
 
@@ -49,7 +50,13 @@ function getSpeechRecognitionAPI(): (new () => SpeechRecognitionInstance) | unde
 export function VoiceInputButton({ onTranscript, disabled }: VoiceInputButtonProps) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const onTranscriptRef = useRef(onTranscript);
+
+  useEffect(() => {
+    onTranscriptRef.current = onTranscript;
+  }, [onTranscript]);
 
   useEffect(() => {
     const SpeechRecognitionAPI = getSpeechRecognitionAPI();
@@ -62,16 +69,18 @@ export function VoiceInputButton({ onTranscript, disabled }: VoiceInputButtonPro
 
     const recognition = new SpeechRecognitionAPI();
     recognition.lang = "fr-FR";
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = false;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[0][0].transcript;
-      onTranscript(transcript);
-      setIsListening(false);
+      const transcript = getFinalSpeechTranscript(event);
+      if (transcript) onTranscriptRef.current(transcript);
     };
 
-    recognition.onerror = () => setIsListening(false);
+    recognition.onerror = (event) => {
+      setError(`La reconnaissance vocale a échoué (${event.type}). Réessayez.`);
+      setIsListening(false);
+    };
     recognition.onend = () => setIsListening(false);
 
     recognitionRef.current = recognition;
@@ -80,7 +89,7 @@ export function VoiceInputButton({ onTranscript, disabled }: VoiceInputButtonPro
       window.clearTimeout(supportTimer);
       recognition.stop();
     };
-  }, [onTranscript]);
+  }, []);
 
   const toggleListening = () => {
     if (!recognitionRef.current) return;
@@ -89,6 +98,7 @@ export function VoiceInputButton({ onTranscript, disabled }: VoiceInputButtonPro
       recognitionRef.current.stop();
       setIsListening(false);
     } else {
+      setError(null);
       recognitionRef.current.start();
       setIsListening(true);
     }
@@ -97,19 +107,39 @@ export function VoiceInputButton({ onTranscript, disabled }: VoiceInputButtonPro
   if (!isSupported) return null;
 
   return (
-    <button
-      type="button"
-      onClick={toggleListening}
-      disabled={disabled}
-      className={cn(
-        "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors disabled:opacity-50",
-        isListening
-          ? "bg-red-100 text-red-700 animate-pulse"
-          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+    <>
+      <button
+        type="button"
+        onClick={toggleListening}
+        disabled={disabled}
+        className={cn(
+          "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors disabled:opacity-50",
+          isListening
+            ? "bg-red-100 text-red-700 animate-pulse"
+            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+        )}
+      >
+        {isListening ? <MicOff size={13} /> : <Mic size={13} />}
+        {isListening ? "Écoute en cours..." : "Dicter à la voix"}
+      </button>
+      {error && (
+        <span role="alert" className="text-xs text-red-600">
+          {error}
+        </span>
       )}
-    >
-      {isListening ? <MicOff size={13} /> : <Mic size={13} />}
-      {isListening ? "Écoute en cours..." : "Dicter à la voix"}
-    </button>
+    </>
   );
+}
+
+export function getFinalSpeechTranscript(
+  event: Pick<SpeechRecognitionEvent, "results" | "resultIndex">
+): string {
+  const chunks: string[] = [];
+  for (let index = event.resultIndex; index < event.results.length; index += 1) {
+    const result = event.results[index];
+    if (result?.isFinal && result[0]?.transcript.trim()) {
+      chunks.push(result[0].transcript.trim());
+    }
+  }
+  return chunks.join(" ");
 }

@@ -46,7 +46,7 @@ export default async function ClientsPage() {
         }
       />
       <div className="page-container">
-        <ClientsTable initialClients={clients} />
+        <ClientsTable initialClients={clients} companyId={company.id} />
       </div>
     </>
   );
