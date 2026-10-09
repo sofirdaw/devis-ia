@@ -5,8 +5,8 @@ import { getSiteUrl } from "@/lib/site-url";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const siteUrl = getSiteUrl();
   const requestUrl = new URL(request.url);
+  const siteUrl = getSiteUrl(requestUrl.origin);
 
   if (requestUrl.origin !== siteUrl) {
     return NextResponse.redirect(new URL("/auth/google", siteUrl));
