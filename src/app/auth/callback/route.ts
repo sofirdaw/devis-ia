@@ -30,6 +30,26 @@ export async function GET(request: Request) {
     );
   }
 
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    console.error("Utilisateur absent après le callback OAuth:", userError?.message);
+    return NextResponse.redirect(`${origin}/login?error=auth_callback_error`);
+  }
+
+  const { data: company, error: companyError } = await supabase
+    .from("companies")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (companyError) {
+    console.error("Erreur de vérification de l'entreprise après OAuth:", companyError.message);
+    return NextResponse.redirect(`${origin}/setup?error=company_lookup_failed`);
+  }
+  if (!company) return NextResponse.redirect(`${origin}/setup`);
+
   const next = searchParams.get("next") ?? "/dashboard";
 
   return NextResponse.redirect(`${origin}${next}`);

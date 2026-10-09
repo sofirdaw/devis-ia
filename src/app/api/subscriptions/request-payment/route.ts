@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { PLANS, type PlanId } from "@/lib/subscription";
+import { companyCacheKey, dashboardCacheKey, invalidateCache } from "@/lib/cache";
 
 export const runtime = "nodejs";
 
@@ -44,7 +45,69 @@ export async function POST(request: Request) {
       .select("id")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (!company) return NextResponse.json({ error: "Entreprise introuvable." }, { status: 404 });
+    if (!company) {
+      return NextResponse.json(
+        {
+          error:
+            "Terminez d'abord la configuration de votre entreprise pour activer l'essai gratuit et demander un forfait.",
+          setupRequired: true,
+        },
+        { status: 409 }
+      );
+    }
+
+    const { data: trialCompany, error: trialError } = await supabase
+      .from("companies")
+      .select(
+        "subscription_status, subscription_plan, subscription_expires_at, trial_started_at, trial_ends_at"
+      )
+      .eq("id", company.id)
+      .maybeSingle();
+    if (trialError || !trialCompany) {
+      console.error(
+        "Impossible de vérifier l'état d'abonnement avant la demande:",
+        trialError?.message ?? "Entreprise introuvable"
+      );
+      return NextResponse.json(
+        { error: "Impossible de vérifier votre abonnement. Rechargez la page et réessayez." },
+        { status: 500 }
+      );
+    }
+    if (
+      !trialCompany.subscription_status &&
+      !trialCompany.subscription_plan &&
+      !trialCompany.subscription_expires_at &&
+      !trialCompany.trial_started_at &&
+      !trialCompany.trial_ends_at
+    ) {
+      const startedAt = new Date();
+      const endsAt = new Date(startedAt);
+      endsAt.setDate(endsAt.getDate() + 30);
+      const { error: trialUpdateError } = await supabase
+        .from("companies")
+        .update({
+          subscription_status: "trial",
+          trial_started_at: startedAt.toISOString(),
+          trial_ends_at: endsAt.toISOString(),
+        })
+        .eq("id", company.id)
+        .is("subscription_status", null)
+        .is("subscription_plan", null)
+        .is("subscription_expires_at", null)
+        .is("trial_started_at", null)
+        .is("trial_ends_at", null);
+      if (trialUpdateError) {
+        console.error(
+          "Impossible d'initialiser l'essai avant la demande:",
+          trialUpdateError.message
+        );
+        return NextResponse.json(
+          { error: "Impossible d'activer votre essai gratuit. Rechargez la page et réessayez." },
+          { status: 500 }
+        );
+      }
+      await invalidateCache(companyCacheKey(user.id), dashboardCacheKey(company.id));
+    }
 
     const orderId = `MANUAL-${crypto.randomUUID()}`;
     const { data: payment, error } = await supabase
