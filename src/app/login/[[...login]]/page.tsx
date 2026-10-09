@@ -1,11 +1,9 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginAction } from "@/app/actions/auth";
-import { getSiteUrl } from "@/lib/site-url";
 
 function LoginForm() {
   const router = useRouter();
@@ -22,25 +20,7 @@ function LoginForm() {
       setGoogleLoading(true);
       setError("");
 
-      const supabase = createClient();
-      const siteUrl = getSiteUrl();
-
-      if (window.location.origin !== siteUrl) {
-        window.location.replace(`${siteUrl}/login`);
-        return;
-      }
-
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${siteUrl}/auth/callback`,
-        },
-      });
-
-      if (error) {
-        setError(error.message);
-        setGoogleLoading(false);
-      }
+      window.location.assign("/auth/google");
     } catch (err) {
       console.error(err);
       setError("Une erreur est survenue lors de la connexion via Google.");
