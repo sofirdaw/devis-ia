@@ -14,9 +14,9 @@ export default async function AdminSubscriptionsPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-600">
           Administration
         </p>
-        <h1 className="mt-1 text-2xl font-bold text-gray-950">Demandes d&apos;abonnement</h1>
+        <h1 className="mt-1 text-2xl font-bold text-gray-950">Suivi des clients et abonnements</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Vérifiez le reçu Orange Money avant d&apos;activer une licence.
+          Consultez les dossiers clients, l’activité, les incidents et les paiements.
         </p>
       </div>
       <AdminSubscriptionRequests />

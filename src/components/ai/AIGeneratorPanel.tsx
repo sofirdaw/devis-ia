@@ -30,6 +30,8 @@ import type { Client, Product } from "@/types";
 import type { LineItem } from "@/components/documents/LineItemsEditor";
 import { parseDocumentOfflineText } from "@/lib/offline-parser";
 import { extractDocumentFromImageOffline } from "@/lib/offline-ocr";
+import { reportClientEvent } from "@/lib/client-issue-tracker";
+import { useAuthStore } from "@/store/auth.store";
 
 interface AIGeneratorPanelProps {
   documentType: "quote" | "invoice";
@@ -55,6 +57,7 @@ export function AIGeneratorPanel({
   const [result, setResult] = useState<AIExtractionResult["data"] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const userId = useAuthStore((state) => state.user?.id);
 
   const handleGenerate = () => {
     setError(null);
@@ -94,6 +97,7 @@ export function AIGeneratorPanel({
                 };
 
         if (!response.success || !response.data) {
+          if (userId) reportClientEvent(userId, "ai_generation_failed", "AI_SERVER_FAILURE");
           // Fallback automatique si la requête réseau échoue
           if (mode === "text") {
             const fallbackResult = parseDocumentOfflineText(description, clients, products);
@@ -112,8 +116,10 @@ export function AIGeneratorPanel({
           return;
         }
 
+        if (userId) reportClientEvent(userId, "ai_generation_succeeded");
         setResult(response.data);
       } catch {
+        if (userId) reportClientEvent(userId, "ai_generation_failed", "AI_REQUEST_FAILURE");
         // En cas d'exception réseau brutale
         if (mode === "text") {
           const fallbackResult = parseDocumentOfflineText(description, clients, products);
@@ -148,14 +154,15 @@ export function AIGeneratorPanel({
     return (
       <div className="space-y-4">
         {/* Bannière de confirmation IA */}
-        <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-          <CheckCircle2 size={18} className="text-green-600 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+          <CheckCircle2 size={18} className="text-blue-600 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-green-800">
-              Document généré ! Vérifiez les informations ci-dessous.
+            <p className="text-sm font-medium text-blue-800">
+              Brouillon prérempli. Vérifiez le client, les articles, les quantités et les prix avant
+              de créer le document.
             </p>
             {!result.matchedClientId && (
-              <p className="text-xs text-green-700 mt-1">
+              <p className="text-xs text-blue-700 mt-1">
                 Client &quot;{result.clientName}&quot; introuvable — veuillez le sélectionner ou le
                 créer manuellement.
               </p>
@@ -163,7 +170,7 @@ export function AIGeneratorPanel({
           </div>
           <button
             onClick={handleReset}
-            className="text-xs text-green-700 hover:text-green-900 font-medium underline shrink-0"
+            className="text-xs text-blue-700 hover:text-blue-900 font-medium underline shrink-0"
           >
             Recommencer
           </button>
@@ -262,9 +269,14 @@ export function AIGeneratorPanel({
       )}
 
       {error && (
-        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 mt-4 text-sm">
-          <AlertCircle size={14} />
-          {error}
+        <div className="flex min-w-0 items-start gap-2 overflow-hidden bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 mt-4 text-sm">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+          <p
+            role="alert"
+            className="min-w-0 flex-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
+          >
+            {error}
+          </p>
         </div>
       )}
 

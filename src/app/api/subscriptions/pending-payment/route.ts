@@ -20,7 +20,9 @@ export async function GET() {
 
     const { data: payment, error } = await supabase
       .from("subscription_payments")
-      .select("id, plan, status, user_confirmed_at, activated_at, payment_request_expires_at")
+      .select(
+        "id, plan, status, user_confirmed_at, activated_at, payment_request_expires_at, orange_transaction_id"
+      )
       .eq("company_id", company.id)
       .in("status", ["pending", "paid"])
       .order("created_at", { ascending: false })

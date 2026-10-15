@@ -12,6 +12,7 @@ type RequestItem = {
   order_id: string;
   created_at: string;
   user_confirmed_at: string | null;
+  orange_transaction_id: string | null;
   company: { name: string; email: string | null; phone: string | null } | null;
 };
 
@@ -145,6 +146,12 @@ export function AdminSubscriptionRequests() {
               )}
             </p>
             <p className="font-mono text-xs text-gray-400">{item.order_id}</p>
+            <p className="text-sm">
+              Référence transaction :{" "}
+              <strong className="font-mono">
+                {item.orange_transaction_id || "Non renseignée"}
+              </strong>
+            </p>
           </div>
           <div className="flex flex-col items-end gap-2">
             <Button

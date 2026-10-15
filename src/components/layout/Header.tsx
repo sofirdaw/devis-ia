@@ -20,14 +20,16 @@ interface HeaderProps {
 
 export function Header({ title, description, actions, backButton }: HeaderProps) {
   return (
-    <header className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-4 max-lg:pr-16">
+    <header className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-4 max-lg:pr-36">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         {/* Titre de page avec bouton retour optionnel */}
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           {backButton}
-          <div>
+          <div className="min-w-0">
             <h1 className="text-lg sm:text-xl font-semibold text-gray-900">{title}</h1>
-            {description && <div className="text-sm text-gray-500 mt-0.5">{description}</div>}
+            {description && (
+              <div className="break-words text-sm text-gray-500 mt-0.5">{description}</div>
+            )}
           </div>
         </div>
 

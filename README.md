@@ -8,7 +8,7 @@ Application web moderne de gestion de devis et factures avec intelligence artifi
 - **Gestion complète** : Devis, factures, clients, produits, fournisseurs
 - **Suivi des créances** : Tableau de bord avec statistiques et graphiques
 - **Impression directe** : Génération de PDF professionnels
-- **Authentification sécurisée** : Intégration avec Clerk
+- **Authentification sécurisée** : Supabase Auth
 - **Base de données robuste** : Supabase avec Row Level Security
 - **Interface moderne** : Design responsive avec Tailwind CSS
 - **Mode hors-ligne** : Cache local des données métier, créations/modifications/suppressions en file d'attente, puis synchronisation au retour du réseau
@@ -19,7 +19,7 @@ Application web moderne de gestion de devis et factures avec intelligence artifi
 - Node.js 20+
 - npm ou yarn
 - Un compte Supabase (gratuit)
-- Un compte Clerk (gratuit)
+- Un projet Supabase avec Auth et l'envoi d'e-mails configurés
 - Clé API OpenAI ou Groq (pour l'IA)
 
 ## 🛠️ Installation
@@ -46,16 +46,7 @@ npm install
    - Bucket `pdfs` (privé) : pour les PDF générés
 4. Récupérez vos clés API dans Settings → API
 
-### 4. Configurer Clerk
-
-1. Créez une application sur [clerk.com](https://clerk.com)
-2. Activez l'authentification par email/mot de passe
-3. Configurez les redirections :
-   - Après connexion : `/dashboard`
-   - après déconnexion : `/sign-in`
-4. Récupérez vos clés API dans Dashboard → API Keys
-
-### 5. Configurer les variables d'environnement
+### 4. Configurer les variables d'environnement
 
 Créez un fichier `.env.local` à la racine du projet :
 
@@ -63,6 +54,8 @@ Créez un fichier `.env.local` à la racine du projet :
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=votre_url_supabase
 NEXT_PUBLIC_SUPABASE_ANON_KEY=votre_cle_anon_supabase
+# Clé service role, réservée au serveur (ne jamais préfixer par NEXT_PUBLIC_)
+SUPABASE_SERVICE_ROLE_KEY=votre_cle_service_role
 # URL canonique utilisée pour les flux OAuth et PKCE
 NEXT_PUBLIC_SITE_URL=https://dev-fac-ia.vercel.app
 
@@ -70,14 +63,28 @@ NEXT_PUBLIC_SITE_URL=https://dev-fac-ia.vercel.app
 # Laisser vide en développement désactive le cache sans bloquer l'application.
 REDIS_URL=redis://:mot_de_passe@hote:6379
 
-# Clerk
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=votre_cle_publique_clerk
-CLERK_SECRET_KEY=votre_cle_secrete_clerk
-
 # OpenAI / Groq (pour l'IA)
-OPENAI_API_KEY=votre_cle_openai
-GROQ_API_KEY=votre_cle_groq  # Optionnel, alternative gratuite
+OPENAI_API_KEY=votre_cle_openai  # Facultatif, doit être valide si renseignée
+GROQ_API_KEY=votre_cle_groq
+GEMINI_API_KEY=votre_cle_gemini  # Recommandé comme fournisseur de secours
+# Modèles Groq actifs (facultatif : ces valeurs sont les valeurs par défaut)
+GROQ_TEXT_MODEL=openai/gpt-oss-20b
+GROQ_TEXT_FALLBACK_MODEL=openai/gpt-oss-120b
+GROQ_VISION_MODEL=qwen/qwen3.8-27b
 ```
+
+La clé `SUPABASE_SERVICE_ROLE_KEY` est utilisée uniquement par les routes
+serveur d'administration. Ne la transmettez jamais au navigateur ni au dépôt.
+Les identifiants Groq Llama 3.3 70B et Llama 3.1 8B précédents ont été retirés
+par Groq en août 2026 ; le projet utilise maintenant les modèles recommandés
+`openai/gpt-oss-20b` et `openai/gpt-oss-120b`. Pour la production, ajoutez les
+clés IA dans Vercel et vérifiez qu'elles sont actives : une réponse HTTP 401
+signifie qu'une clé est invalide ou révoquée, pas que le quota est épuisé.
+Gemini utilise `gemini-3.8-flash` par défaut. La dictée vocale utilise l'API
+native du navigateur quand elle est disponible ; seule l'analyse du texte
+transcrit nécessite un fournisseur IA. Les descriptions avec prix et quantités
+clairs sont d'abord analysées localement pour éviter les erreurs de format et
+économiser le quota ; les cas ambigus sont envoyés aux modèles IA configurés.
 
 Après avoir appliqué `supabase/migrations/migration_add_subscriptions.sql` dans
 Supabase, les entreprises disposent des dates `trial_started_at` et
@@ -103,7 +110,38 @@ forfait. Avant déploiement, appliquer dans Supabase
 `supabase/migrations/migration_idempotent_offline_receivable_payments.sql`
 pour assurer l'idempotence des paiements de créances, ainsi que
 `supabase/migrations/migration_harden_manual_subscription_payments.sql` pour
-les garde-fous des paiements d'abonnement.
+les garde-fous des paiements d'abonnement. Les migrations comparent
+`companies.user_id` à l'identifiant Supabase Auth après conversion explicite en
+texte, car `companies.user_id` peut être une colonne `TEXT`. Si les migrations
+d'abonnement ont déjà été appliquées avant cette correction, réexécuter les
+fichiers `migration_add_subscriptions.sql`,
+`migration_harden_manual_subscription_payments.sql` et
+`fix_subscription_payments_rls.sql`, dans cet ordre, dans le SQL Editor de
+Supabase.
+Après déploiement d'une mise à jour de `migration_harden_manual_subscription_payments.sql`,
+réexécutez ce fichier dans Supabase pour que les validations et le webhook
+ajoutent chaque nouveau forfait après la date d'expiration payante ou la fin
+d'essai gratuit, si elle est plus tardive. Le tableau de bord présente le
+nombre total de jours restants jusqu'à l'expiration.
+
+Pour le panel de suivi client et les événements techniques, appliquer également
+`supabase/migrations/migration_add_client_issue_events.sql`, puis
+`supabase/migrations/migration_add_admin_company_purge.sql` (après les
+migrations créant factures, devis, créances, fournisseurs et abonnements). Configurer
+`CRON_SECRET` dans les variables d'environnement Vercel pour purger chaque jour
+les événements techniques de plus de 90 jours. La file temporaire hors ligne
+est isolée par compte et ne contient que des catégories d’événements, des routes
+sans paramètres et des codes techniques autorisés. La création de comptes par
+l'administration envoie une invitation Supabase Auth : le service d'e-mail
+Supabase doit être configuré. Le panel ne lit ni ne définit de mot de passe.
+
+Le paiement Orange Money manuel demande au client la référence de transaction
+indiquée dans son SMS de confirmation ; le code secret ou OTP Orange Money ne
+doit jamais être saisi dans l'application. L'administrateur vérifie la
+référence avec le paiement reçu avant d'activer l'abonnement. Après ajout de
+ce champ, réexécuter `migration_add_subscriptions.sql`, puis
+`migration_harden_manual_subscription_payments.sql` dans Supabase pour
+actualiser les installations existantes.
 
 Pour les PDF, appliquer également
 `supabase/migrations/migration_add_pdf_templates.sql` dans Supabase. Chaque
@@ -129,7 +167,7 @@ les routes de l'application utilisées hors-ligne. Le service worker n'est pas
 activé en développement : valider le parcours réseau coupé sur un build de
 production servi par `npm run start` ou sur l'application déployée.
 
-### 6. Lancer le projet
+### 5. Lancer le projet
 
 ```bash
 npm run dev
@@ -202,7 +240,7 @@ Toutes les tables sont protégées par Row Level Security (RLS) pour garantir qu
 - **Styling** : Tailwind CSS 4
 - **UI Components** : Radix UI (shadcn/ui)
 - **Base de données** : Supabase (PostgreSQL)
-- **Authentification** : Clerk
+- **Authentification** : Supabase Auth
 - **IA** : OpenAI / Groq
 - **PDF** : @react-pdf/renderer
 - **Graphiques** : Recharts
@@ -224,7 +262,7 @@ npm run lint     # Exécute ESLint
 
 1. Poussez votre code sur GitHub
 2. Importez le projet sur [Vercel](https://vercel.com)
-3. Configurez les variables d'environnement, notamment `NEXT_PUBLIC_SITE_URL` avec le domaine public canonique
+3. Configurez les variables d'environnement, notamment `NEXT_PUBLIC_SITE_URL`, `SUPABASE_SERVICE_ROLE_KEY` et `CRON_SECRET`
 4. Dans Supabase, ajoutez `https://dev-fac-ia.vercel.app/auth/callback` aux Redirect URLs et utilisez la même URL comme Site URL
 5. Déployez
 
@@ -252,6 +290,5 @@ Pour toute question ou problème :
 - Ouvrez une issue sur GitHub
 - Consultez la documentation Next.js
 - Consultez la documentation Supabase
-- Consultez la documentation Clerk
 
 # devis-ia

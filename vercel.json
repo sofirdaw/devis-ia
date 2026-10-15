@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/purge-client-events",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

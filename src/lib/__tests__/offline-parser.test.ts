@@ -70,6 +70,12 @@ describe("Moteur de Parsing Hors-Ligne (NLP Heuristique)", () => {
     expect(result.data?.items).toBeUndefined();
   });
 
+  it("refuse une phrase d'instruction qui ne contient aucun article exploitable", () => {
+    const result = parseDocumentOfflineText("Crée-moi une pour achat de ça", [], []);
+
+    expect(result.success).toBe(false);
+  });
+
   it("extrait un devis avec plusieurs articles", () => {
     const input = "Facture pour Ibrahim, 3 HP EliteBook à 250000 et 1 souris à 5000";
     const result = parseDocumentOfflineText(input, mockClients, mockProducts);
@@ -152,6 +158,49 @@ Livre
         designation: "Installation réseau",
         quantity: 1,
         unit_price: 35000,
+      },
+    ]);
+  });
+
+  it("parse les nombres dictés et garde le prix donné plutôt que le prix du catalogue", () => {
+    const result = parseDocumentOfflineText(
+      "Devis pour Moussa : deux caméras solaires à 30 000 Fr. et deux câbles à 5 000 Fr.",
+      mockClients,
+      mockProducts
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.data?.items).toEqual([
+      {
+        product_id: "prod_1",
+        designation: "Caméra Solaire",
+        quantity: 2,
+        unit_price: 30000,
+      },
+      {
+        product_id: null,
+        designation: "Câbles",
+        quantity: 2,
+        unit_price: 5000,
+      },
+    ]);
+  });
+
+  it("garde le prix unitaire en milliers et extrait le nombre total de pièces", () => {
+    const result = parseDocumentOfflineText(
+      "Devis pour Fatima, achat de savon 15g à 15.000 FCFA l'unité ; avec pour total 25 pièces",
+      [],
+      []
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.data?.clientName).toBe("Fatima");
+    expect(result.data?.items).toEqual([
+      {
+        product_id: null,
+        designation: "Savon 15g",
+        quantity: 25,
+        unit_price: 15000,
       },
     ]);
   });

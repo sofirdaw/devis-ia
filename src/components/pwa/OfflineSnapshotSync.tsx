@@ -24,6 +24,7 @@ import { syncPendingData } from "@/lib/offline-sync";
 export function OfflineSnapshotSync() {
   const router = useRouter();
   const companyId = useAuthStore((state) => state.company?.id);
+  const isAuthLoading = useAuthStore((state) => state.isLoading);
   const running = useRef(false);
 
   useEffect(() => {
@@ -97,7 +98,7 @@ export function OfflineSnapshotSync() {
   }, [companyId, router]);
 
   const refreshSnapshot = useCallback(async () => {
-    if (!companyId || !navigator.onLine || running.current) return;
+    if (!companyId || isAuthLoading || !navigator.onLine || running.current) return;
     running.current = true;
 
     try {
@@ -287,7 +288,7 @@ export function OfflineSnapshotSync() {
     } finally {
       running.current = false;
     }
-  }, [companyId]);
+  }, [companyId, isAuthLoading]);
 
   useEffect(() => {
     void refreshSnapshot();

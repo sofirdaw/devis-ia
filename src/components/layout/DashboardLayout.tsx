@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "./Sidebar";
 import { hasOfflineSubscriptionAccess } from "@/lib/offline-pwa";
 import { OfflineSnapshotSync } from "@/components/pwa/OfflineSnapshotSync";
+import { ClientIssueTracker } from "@/components/pwa/ClientIssueTracker";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -131,6 +132,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="flex min-h-dvh bg-gray-50 overflow-x-hidden">
       <OfflineSnapshotSync />
+      <ClientIssueTracker />
       <Sidebar />
 
       <main className="flex-1 min-w-0 ml-0 lg:ml-60 flex flex-col overflow-x-hidden overflow-y-hidden">

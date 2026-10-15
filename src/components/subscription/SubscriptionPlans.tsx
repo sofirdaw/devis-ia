@@ -27,6 +27,7 @@ export function SubscriptionPlans({
   const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
   const [requestingPlan, setRequestingPlan] = useState<PlanId | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
+  const [transactionReference, setTransactionReference] = useState("");
   const [pendingPlan, setPendingPlan] = useState<PlanId | null>(null);
   const [reusedRequest, setReusedRequest] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null);
@@ -67,6 +68,7 @@ export function SubscriptionPlans({
             user_confirmed_at: string | null;
             activated_at: string | null;
             subscription_expires_at: string | null;
+            orange_transaction_id: string | null;
           } | null;
         };
         if (!active) return;
@@ -87,6 +89,7 @@ export function SubscriptionPlans({
           return;
         }
         setRequestId(result.payment.id);
+        setTransactionReference(result.payment.orange_transaction_id ?? "");
         setPendingPlan(result.payment.plan);
         setPaymentStatus(result.payment.status);
         setPaymentConfirmed(Boolean(result.payment.user_confirmed_at));
@@ -152,6 +155,7 @@ export function SubscriptionPlans({
       };
       if (!response.ok) throw new Error(result.error || "Demande non créée.");
       setRequestId(result.requestId || null);
+      setTransactionReference("");
       setPendingPlan(result.plan || plan);
       setPaymentStatus("pending");
       setPaymentConfirmed(Boolean(result.alreadyConfirmed));
@@ -213,17 +217,25 @@ export function SubscriptionPlans({
       return false;
     }
     if (!requestId) return false;
+    const reference = transactionReference.trim();
+    if (reference.length < 4 || reference.length > 80) {
+      setActivationMessage(
+        "Saisissez la référence de transaction indiquée dans le SMS Orange Money."
+      );
+      return false;
+    }
     setActivationMessage(null);
     try {
       const response = await fetch("/api/subscriptions/confirm-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId }),
+        body: JSON.stringify({ requestId, transactionReference: reference }),
       });
       const result = (await response.json()) as { error?: string; alreadyConfirmed?: boolean };
       if (!response.ok) throw new Error(result.error || "Confirmation impossible.");
       setPaymentStatus("pending");
       setPaymentConfirmed(true);
+      setTransactionReference(reference);
       setSelectedPlan(null);
       return true;
     } catch (confirmationError) {
@@ -301,8 +313,14 @@ export function SubscriptionPlans({
             <>
               Votre demande pour le forfait{" "}
               <strong>{PLANS[pendingPlan ?? activatedPlan ?? "monthly"].label}</strong> est déjà
-              envoyée. Elle ne sera pas recréée : l&apos;état sera actualisé après validation par
-              l&apos;administrateur.
+              reçue et en cours de vérification. Ne refaites pas le paiement ; l&apos;état sera
+              actualisé après contrôle par notre équipe.
+              {transactionReference && (
+                <>
+                  {" "}
+                  Référence de transaction : <strong>{transactionReference}</strong>.
+                </>
+              )}
             </>
           )}
         </div>
@@ -378,8 +396,8 @@ export function SubscriptionPlans({
                 >
                   <CircleCheck className="mt-0.5 shrink-0 text-green-600" size={20} />
                   <p>
-                    Demande envoyée, en attente de confirmation de l&apos;administrateur. Votre
-                    abonnement sera activé dès que le paiement sera vérifié.
+                    Référence enregistrée. Votre paiement est en cours de vérification ; votre
+                    abonnement sera activé après contrôle par notre équipe.
                   </p>
                 </div>
               ) : (
@@ -404,18 +422,38 @@ export function SubscriptionPlans({
                       <strong>1.</strong> Composez le code et validez l&apos;opération.
                     </li>
                     <li>
-                      <strong>2.</strong> Saisissez votre code secret Orange Money.
+                      <strong>2.</strong> Saisissez votre code secret uniquement dans le menu
+                      officiel Orange Money. Ne le communiquez jamais à l&apos;application ou à
+                      l&apos;administrateur.
                     </li>
                     <li>
-                      <strong>3.</strong> Conservez le SMS de confirmation.
+                      <strong>3.</strong> Conservez le SMS de confirmation et relevez sa référence
+                      de transaction.
+                    </li>
+                    <li className="space-y-2">
+                      <label htmlFor="orange-transaction-reference" className="font-semibold">
+                        Référence de transaction / reçu
+                      </label>
+                      <input
+                        id="orange-transaction-reference"
+                        value={transactionReference}
+                        onChange={(event) =>
+                          setTransactionReference(event.target.value.slice(0, 80))
+                        }
+                        autoComplete="off"
+                        maxLength={80}
+                        required
+                        placeholder="Ex. référence indiquée dans le SMS Orange"
+                        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                      />
                     </li>
                     <li>
-                      <strong>4.</strong> Cliquez sur « J&apos;ai payé » pour envoyer la demande de
-                      vérification.
+                      <strong>4.</strong> Cliquez sur « J&apos;ai payé » pour transmettre la
+                      référence et demander une vérification.
                     </li>
                     <li>
-                      <strong>5.</strong> Après validation par l&apos;administrateur, votre
-                      abonnement sera activé automatiquement.
+                      <strong>5.</strong> Votre demande passe en vérification. L&apos;accès sera
+                      activé après validation du paiement par notre équipe.
                     </li>
                   </ol>
                   <div className="flex justify-end gap-2">
@@ -432,9 +470,13 @@ export function SubscriptionPlans({
                   <Button
                     className="w-full"
                     onClick={confirmPayment}
-                    disabled={paymentConfirmed || paymentStatus === "paid"}
+                    disabled={
+                      paymentConfirmed ||
+                      paymentStatus === "paid" ||
+                      transactionReference.trim().length < 4
+                    }
                   >
-                    J&apos;ai payé, valider
+                    Envoyer pour vérification
                   </Button>
                   {activationMessage && (
                     <div

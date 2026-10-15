@@ -67,13 +67,16 @@ export async function POST(request: Request) {
     const now = new Date();
     const currentCompany = await admin
       .from("companies")
-      .select("subscription_expires_at")
+      .select("subscription_expires_at, trial_ends_at")
       .eq("id", company.id)
       .single();
-    const currentExpiry = currentCompany.data?.subscription_expires_at
+    const paidExpiry = currentCompany.data?.subscription_expires_at
       ? new Date(currentCompany.data.subscription_expires_at)
       : now;
-    const startsAt = currentExpiry > now ? currentExpiry : now;
+    const trialExpiry = currentCompany.data?.trial_ends_at
+      ? new Date(currentCompany.data.trial_ends_at)
+      : now;
+    const startsAt = new Date(Math.max(now.getTime(), paidExpiry.getTime(), trialExpiry.getTime()));
     const expiresAt = new Date(startsAt);
     if (payment.plan === "monthly") expiresAt.setMonth(expiresAt.getMonth() + 1);
     if (payment.plan === "quarter") expiresAt.setMonth(expiresAt.getMonth() + 3);

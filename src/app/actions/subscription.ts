@@ -18,14 +18,21 @@ export async function subscribeCompanyAction(plan: Plan) {
 
   const { data: company } = await supabase
     .from("companies")
-    .select("id")
+    .select("id, subscription_expires_at, trial_ends_at")
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (!company?.id) return { error: "Entreprise introuvable" };
 
   const now = new Date();
-  const expires = new Date(now);
+  const currentExpiry = company.subscription_expires_at
+    ? new Date(company.subscription_expires_at)
+    : now;
+  const trialExpiry = company.trial_ends_at ? new Date(company.trial_ends_at) : now;
+  const startsAt = new Date(
+    Math.max(now.getTime(), currentExpiry.getTime(), trialExpiry.getTime())
+  );
+  const expires = new Date(startsAt);
   if (plan === "monthly") {
     expires.setMonth(expires.getMonth() + 1);
   } else if (plan === "quarter") {
@@ -39,7 +46,7 @@ export async function subscribeCompanyAction(plan: Plan) {
     .update({
       subscription_plan: plan,
       subscription_status: "active",
-      subscription_started_at: now.toISOString(),
+      subscription_started_at: startsAt.toISOString(),
       subscription_expires_at: expires.toISOString(),
     })
     .eq("id", company.id);

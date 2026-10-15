@@ -66,13 +66,13 @@ function buildCatalogContext(products: Product[]): string {
 
   const catalogList = products.map((p) => `- "${p.name}" : ${p.price} FCFA`).join("\n");
 
-  return `\n\nCatalogue produits existants de l'entreprise (réutilise EXACTEMENT ces noms et prix si l'utilisateur les mentionne, même approximativement) :\n${catalogList}`;
+  return `\n\nCatalogue produits existants de l'entreprise (utilise-le uniquement pour reconnaître un article ou compléter un prix absent. Le prix explicitement donné par l'utilisateur est toujours prioritaire. Ne crée pas d'article absent de sa demande) :\n${catalogList}`;
 }
 
 function looksLikeMalformedAIItem(item: {
   designation: string;
-  quantity?: number;
-  unit_price?: number;
+  quantity?: number | string;
+  unit_price?: number | string;
 }) {
   const designation = (item.designation ?? "").trim();
   if (!designation) return true;
@@ -92,11 +92,24 @@ function looksLikeMalformedAIItem(item: {
   return hasHeaderNoise || hasPriceInName || hasCommaThenWord || looksLikeWholeInstruction;
 }
 
+function parseAIAmount(value: number | string): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const normalized = value
+    .replace(/(?:fcfa|cfa|francs?|f)\s*/gi, "")
+    .replace(/\u00a0/g, " ")
+    .trim();
+  if (/^\d{1,3}(?:[ .]\d{3})+$/.test(normalized)) {
+    return Number(normalized.replace(/[ .]/g, ""));
+  }
+  const parsed = Number(normalized.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function sanitizeAIItems(
   items: Array<{
     designation: string;
-    quantity: number;
-    unit_price: number;
+    quantity: number | string;
+    unit_price: number | string;
     product_id?: string | null;
   }>,
   description: string,
@@ -137,7 +150,7 @@ function sanitizeAIItems(
     const matchedProduct = products.find(
       (product) => normalizedName(product.name) === normalizedName(designation)
     );
-    const parsedUnitPrice = Number(item.unit_price);
+    const parsedUnitPrice = parseAIAmount(item.unit_price);
     const unitPrice =
       Number.isFinite(parsedUnitPrice) && parsedUnitPrice > 0
         ? parsedUnitPrice
@@ -167,6 +180,28 @@ export async function generateDocumentFromText(description: string): Promise<AIE
     return {
       success: false,
       error: "Impossible de récupérer le contexte entreprise",
+    };
+  }
+
+  const parserClients: Client[] = context.clients.map((client) => ({
+    id: client.id,
+    company_id: context.companyId,
+    name: client.name,
+    phone: null,
+    email: null,
+    address: null,
+    created_at: "",
+  }));
+  const localResult = parseDocumentOfflineText(
+    description,
+    parserClients,
+    context.products as Product[]
+  );
+  if (localResult.success && localResult.data) {
+    return {
+      success: true,
+      providerUsed: "Analyse structurée locale",
+      data: localResult.data,
     };
   }
 
@@ -204,8 +239,8 @@ export async function generateDocumentFromText(description: string): Promise<AIE
     parsed.items.map((item) => ({
       product_id: null,
       designation: item.designation,
-      quantity: item.quantity || 1,
-      unit_price: item.unit_price ?? 0,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
     })),
     description,
     context.clients,

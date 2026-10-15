@@ -25,9 +25,10 @@ export async function GET(request: Request) {
 
   if (exchangeError) {
     console.error("Erreur Supabase exchangeCodeForSession:", exchangeError.message);
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(exchangeError.message)}`
-    );
+    const errorMessage = exchangeError.message.includes("PKCE code verifier not found")
+      ? "La tentative de connexion Google a expiré ou le cookie de vérification est indisponible. Relancez la connexion depuis cette page, dans le même navigateur."
+      : exchangeError.message;
+    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(errorMessage)}`);
   }
 
   const {

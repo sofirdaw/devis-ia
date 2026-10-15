@@ -32,6 +32,7 @@ import {
   Menu,
   X,
   CreditCard,
+  CircleHelp,
 } from "lucide-react";
 
 // Définition des items de navigation
@@ -80,6 +81,11 @@ const NAV_ITEMS: {
 ];
 
 const BOTTOM_ITEMS = [
+  {
+    label: "Centre d’aide",
+    href: "/help",
+    icon: CircleHelp,
+  },
   {
     label: "Abonnement",
     href: "/subscription",
@@ -146,8 +152,7 @@ export function Sidebar() {
       {/* Mobile menu button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="lg:hidden fixed top-3 right-1 sm:top-4 sm:right-4 z-50 flex h-8 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-lg bg-gray-900 text-white shadow-lg transition-colors hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-        style={{ marginRight: "6rem", marginTop: "0.5rem" }}
+        className="lg:hidden fixed top-4 right-20 z-50 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-900 text-white shadow-lg transition-colors hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
         aria-label="Ouvrir le menu"
         aria-expanded={isOpen}
         aria-controls="dashboard-sidebar"
@@ -259,7 +264,7 @@ export function Sidebar() {
         <div className="border-t border-gray-800 px-3 py-3 space-y-1">
           {BOTTOM_ITEMS.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
 
             return (
               <Link

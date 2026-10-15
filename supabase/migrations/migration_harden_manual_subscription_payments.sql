@@ -41,7 +41,8 @@ SET search_path = public
 AS $$
 BEGIN
   IF auth.uid() IS NULL OR NOT EXISTS (
-    SELECT 1 FROM companies c WHERE c.id = p_company_id AND c.user_id = auth.uid()
+    SELECT 1 FROM companies c
+    WHERE c.id = p_company_id AND c.user_id::TEXT = auth.uid()::TEXT
   ) THEN
     RAISE EXCEPTION 'Entreprise introuvable.' USING ERRCODE = '42501';
   END IF;
@@ -131,6 +132,7 @@ DECLARE
   payment_row subscription_payments%ROWTYPE;
   company_user_id UUID;
   current_expiry TIMESTAMPTZ;
+  trial_expiry TIMESTAMPTZ;
   activation_start TIMESTAMPTZ;
   activation_expiry TIMESTAMPTZ;
   activation_time TIMESTAMPTZ := NOW();
@@ -145,8 +147,8 @@ BEGIN
     RAISE EXCEPTION 'Demande introuvable.' USING ERRCODE = 'P0002';
   END IF;
 
-  SELECT c.user_id, c.subscription_expires_at
-  INTO company_user_id, current_expiry
+  SELECT c.user_id, c.subscription_expires_at, c.trial_ends_at
+  INTO company_user_id, current_expiry, trial_expiry
   FROM companies c
   WHERE c.id = payment_row.company_id
   FOR UPDATE;
@@ -186,7 +188,11 @@ BEGIN
     RAISE EXCEPTION 'Montant du paiement invalide.' USING ERRCODE = '22023';
   END IF;
 
-  activation_start := GREATEST(COALESCE(current_expiry, activation_time), activation_time);
+  activation_start := GREATEST(
+    COALESCE(current_expiry, activation_time),
+    COALESCE(trial_expiry, activation_time),
+    activation_time
+  );
   activation_expiry := CASE payment_row.plan
     WHEN 'monthly' THEN activation_start + INTERVAL '30 days'
     WHEN 'quarter' THEN activation_start + INTERVAL '3 months'
@@ -236,6 +242,7 @@ DECLARE
   payment_row subscription_payments%ROWTYPE;
   company_user_id UUID;
   current_expiry TIMESTAMPTZ;
+  trial_expiry TIMESTAMPTZ;
   activation_start TIMESTAMPTZ;
   activation_expiry TIMESTAMPTZ;
   activation_time TIMESTAMPTZ := NOW();
@@ -250,8 +257,8 @@ BEGIN
     RAISE EXCEPTION 'Commande inconnue.' USING ERRCODE = 'P0002';
   END IF;
 
-  SELECT c.user_id, c.subscription_expires_at
-  INTO company_user_id, current_expiry
+  SELECT c.user_id, c.subscription_expires_at, c.trial_ends_at
+  INTO company_user_id, current_expiry, trial_expiry
   FROM companies c
   WHERE c.id = payment_row.company_id
   FOR UPDATE;
@@ -282,7 +289,11 @@ BEGIN
     RAISE EXCEPTION 'Forfait ou montant invalide.' USING ERRCODE = '22023';
   END IF;
 
-  activation_start := GREATEST(COALESCE(current_expiry, activation_time), activation_time);
+  activation_start := GREATEST(
+    COALESCE(current_expiry, activation_time),
+    COALESCE(trial_expiry, activation_time),
+    activation_time
+  );
   activation_expiry := CASE payment_row.plan
     WHEN 'monthly' THEN activation_start + INTERVAL '30 days'
     WHEN 'quarter' THEN activation_start + INTERVAL '3 months'

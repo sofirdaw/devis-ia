@@ -10,7 +10,7 @@ import { Header } from "@/components/layout";
 import { DashboardActivity } from "@/components/dashboard/DashboardActivity";
 import { getDashboardStats } from "@/app/actions/dashboard";
 import { requireCurrentCompany } from "@/lib/current-company";
-import { getRemainingTrialDays, PLANS } from "@/lib/subscription";
+import { getRemainingSubscriptionDays, getRemainingTrialDays } from "@/lib/subscription";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +19,7 @@ export default async function DashboardPage() {
   const stats = await getDashboardStats();
   const company = await requireCurrentCompany();
   const trialDaysRemaining = getRemainingTrialDays(company.trial_ends_at);
+  const subscriptionDaysRemaining = getRemainingSubscriptionDays(company.subscription_expires_at);
 
   // Rediriger vers setup si l'utilisateur n'a pas d'entreprise
   if (!stats) {
@@ -35,8 +36,8 @@ export default async function DashboardPage() {
               Forfait actuel :{" "}
               {company.subscription_status === "trial"
                 ? "Essai gratuit"
-                : company.subscription_plan && company.subscription_plan in PLANS
-                  ? PLANS[company.subscription_plan as keyof typeof PLANS].label
+                : company.subscription_status === "active" && subscriptionDaysRemaining > 0
+                  ? "Abonnement actif"
                   : "À choisir"}
             </p>
             {company.subscription_status === "trial" && company.trial_ends_at && (
@@ -52,6 +53,21 @@ export default async function DashboardPage() {
                 .
               </p>
             )}
+            {company.subscription_status === "active" &&
+              company.subscription_expires_at &&
+              subscriptionDaysRemaining > 0 && (
+                <p className="mt-1 text-orange-800">
+                  Il vous reste{" "}
+                  <strong>
+                    {subscriptionDaysRemaining} {subscriptionDaysRemaining === 1 ? "jour" : "jours"}
+                  </strong>
+                  , jusqu&apos;au{" "}
+                  {new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" }).format(
+                    new Date(company.subscription_expires_at)
+                  )}
+                  .
+                </p>
+              )}
           </div>
           <Link
             href="/subscription"

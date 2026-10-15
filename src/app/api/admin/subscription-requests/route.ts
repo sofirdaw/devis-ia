@@ -32,7 +32,7 @@ export async function GET() {
   const { data: payments, error } = await supabase
     .from("subscription_payments")
     .select(
-      "id, company_id, plan, amount, currency, order_id, status, created_at, payment_request_expires_at, user_confirmed_at"
+      "id, company_id, plan, amount, currency, order_id, status, created_at, payment_request_expires_at, user_confirmed_at, orange_transaction_id"
     )
     .eq("status", "pending")
     .not("user_confirmed_at", "is", null)

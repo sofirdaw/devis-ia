@@ -17,8 +17,8 @@ export type AIExtractionPayload = {
   client_name: string;
   items: Array<{
     designation: string;
-    quantity: number;
-    unit_price: number;
+    quantity: number | string;
+    unit_price: number | string;
   }>;
   notes?: string;
   date?: string;
@@ -75,15 +75,60 @@ function getApiKeys(envVarName: string): string[] {
     );
 }
 
+function getKeysWithFallback(dedicatedKeyName: string, generalKeyName?: string): string[] {
+  const dedicated = getApiKeys(dedicatedKeyName);
+  if (dedicated.length > 0) return dedicated;
+  if (generalKeyName) {
+    return getApiKeys(generalKeyName);
+  }
+  return [];
+}
+
 /**
  * Génère la liste ordonnée des cibles IA pour la VISION (OCR Image)
  */
 function getVisionTargets(): ProviderTarget[] {
   const targets: ProviderTarget[] = [];
 
-  // 1. Mistral AI Pixtral & Small (Spécialiste OCR & manuscrit - Stable & Actif)
-  const mistralKeys = getApiKeys("MISTRAL_API_KEY");
-  mistralKeys.forEach((key, idx) => {
+  // 1. Google Gemini 2.0 Flash
+  const gemini20Keys = getKeysWithFallback("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY");
+  gemini20Keys.forEach((key, idx) => {
+    targets.push({
+      name: `Google Gemini 2.5 Flash Vision (Clé ${idx + 1})`,
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      apiKey: key,
+      model: process.env.GEMINI_VISION_MODEL?.trim() || "gemini-2.5-flash",
+      isVision: true,
+    });
+  });
+
+  // 2. Google Gemini 1.5 Flash
+  const gemini15Keys = getKeysWithFallback("GEMINI_15_FLASH_KEY", "GEMINI_API_KEY");
+  gemini15Keys.forEach((key, idx) => {
+    targets.push({
+      name: `Google Gemini 1.5 Flash Vision (Clé ${idx + 1})`,
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      apiKey: key,
+      model: "gemini-1.5-flash",
+      isVision: true,
+    });
+  });
+
+  // 3. Groq Qwen multimodal
+  const groqQwenKeys = getKeysWithFallback("GROQ_QWEN_KEY", "GROQ_API_KEY");
+  groqQwenKeys.forEach((key, idx) => {
+    targets.push({
+      name: `Groq Qwen 2.5 32B Vision (Clé ${idx + 1})`,
+      baseURL: "https://api.groq.com/openai/v1",
+      apiKey: key,
+      model: process.env.GROQ_VISION_MODEL?.trim() || "qwen/qwen3.8-27b",
+      isVision: true,
+    });
+  });
+
+  // 4. Mistral Pixtral 12B
+  const mistralPixtralKeys = getKeysWithFallback("MISTRAL_PIXTRAL_KEY", "MISTRAL_API_KEY");
+  mistralPixtralKeys.forEach((key, idx) => {
     targets.push({
       name: `Mistral Pixtral 12B Vision (Clé ${idx + 1})`,
       baseURL: "https://api.mistral.ai/v1",
@@ -93,18 +138,25 @@ function getVisionTargets(): ProviderTarget[] {
     });
   });
 
-  // 2. OpenRouter Vision (GPT-4o-mini & Gemini)
-  const openRouterKeys = getApiKeys("OPENROUTER_API_KEY");
-  openRouterKeys.forEach((key, idx) => {
+  // 5. OpenRouter Llama 3.2 Vision Free
+  const openRouterVisionKeys = getKeysWithFallback("OPENROUTER_API_KEY");
+  openRouterVisionKeys.forEach((key, idx) => {
     targets.push({
-      name: `OpenRouter GPT-4o Mini Vision (Clé ${idx + 1})`,
+      name: `OpenRouter Llama 3.2 11B Vision Free (Clé ${idx + 1})`,
       baseURL: "https://openrouter.ai/api/v1",
       apiKey: key,
-      model: "openai/gpt-4o-mini",
+      model: "meta-llama/llama-3.2-11b-vision-instruct:free",
       isVision: true,
     });
     targets.push({
-      name: `OpenRouter Gemini 2.0 Flash (Clé ${idx + 1})`,
+      name: `OpenRouter Qwen 2.5 VL 72B Free (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "qwen/qwen-2.5-vl-72b-instruct:free",
+      isVision: true,
+    });
+    targets.push({
+      name: `OpenRouter Gemini Flash Free (Clé ${idx + 1})`,
       baseURL: "https://openrouter.ai/api/v1",
       apiKey: key,
       model: "google/gemini-2.0-flash-exp:free",
@@ -112,33 +164,23 @@ function getVisionTargets(): ProviderTarget[] {
     });
   });
 
-  // 3. Google Gemini Direct (via GEMINI_API_KEY)
-  const geminiKeys = getApiKeys("GEMINI_API_KEY").concat(
-    getApiKeys("GOOGLE_GENERATIVE_AI_API_KEY")
-  );
-  geminiKeys.forEach((key, idx) => {
+  // 6. GitHub Models Vision (GPT-4o-mini)
+  const githubTokens = getKeysWithFallback("GITHUB_TOKEN");
+  githubTokens.forEach((key, idx) => {
     targets.push({
-      name: `Google Gemini 2.0 Flash (Clé ${idx + 1})`,
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      name: `GitHub Models GPT-4o-mini Vision (Clé ${idx + 1})`,
+      baseURL: "https://models.inference.ai.azure.com",
       apiKey: key,
-      model: "gemini-2.0-flash",
-      isVision: true,
-    });
-    targets.push({
-      name: `Google Gemini 1.5 Flash (Clé ${idx + 1})`,
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-      apiKey: key,
-      model: "gemini-1.5-flash",
+      model: "gpt-4o-mini",
       isVision: true,
     });
   });
 
-  // 4. OpenAI Vision (gpt-4o-mini)
-
-  const openAiKeys = getApiKeys("OPENAI_API_KEY");
+  // 7. OpenAI Vision (Secours payant)
+  const openAiKeys = getKeysWithFallback("OPENAI_API_KEY");
   openAiKeys.forEach((key, idx) => {
     targets.push({
-      name: `OpenAI gpt-4o-mini (Clé ${idx + 1})`,
+      name: `OpenAI gpt-4o-mini Vision (Clé ${idx + 1})`,
       apiKey: key,
       model: "gpt-4o-mini",
       isVision: true,
@@ -154,30 +196,128 @@ function getVisionTargets(): ProviderTarget[] {
 function getTextTargets(): ProviderTarget[] {
   const targets: ProviderTarget[] = [];
 
-  // 1. Groq (Ultra-rapide & Gratuit)
-  const groqKeys = getApiKeys("GROQ_API_KEY");
-  groqKeys.forEach((key, idx) => {
+  // 1. Google Gemini Flash
+  const gemini20Keys = getKeysWithFallback("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY");
+  gemini20Keys.forEach((key, idx) => {
     targets.push({
-      name: `Groq Llama 3.3 70B (Clé ${idx + 1})`,
-      baseURL: "https://api.groq.com/openai/v1",
+      name: `1. Google Gemini 2.5 Flash (Clé ${idx + 1})`,
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
       apiKey: key,
-      model: "llama-3.3-70b-versatile",
+      model: process.env.GEMINI_TEXT_MODEL?.trim() || "gemini-2.5-flash",
       isVision: false,
     });
     targets.push({
-      name: `Groq Llama 3.1 8B (Clé ${idx + 1})`,
-      baseURL: "https://api.groq.com/openai/v1",
+      name: `2. Google Gemini Flash Lite (Clé ${idx + 1})`,
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
       apiKey: key,
-      model: "llama-3.1-8b-instant",
+      model: "gemini-2.5-flash-lite",
       isVision: false,
     });
   });
 
-  // 2. Mistral AI (Ultra-stable)
-  const mistralKeys = getApiKeys("MISTRAL_API_KEY");
-  mistralKeys.forEach((key, idx) => {
+  // 3. Groq (GPT-OSS 20B & 120B - Inférence ultra-rapide)
+  const groqKeys = getKeysWithFallback("GROQ_API_KEY");
+  groqKeys.forEach((key, idx) => {
     targets.push({
-      name: `Mistral Small (Clé ${idx + 1})`,
+      name: `3. Groq GPT-OSS 20B (Clé ${idx + 1})`,
+      baseURL: "https://api.groq.com/openai/v1",
+      apiKey: key,
+      model: process.env.GROQ_TEXT_MODEL?.trim() || "openai/gpt-oss-20b",
+      isVision: false,
+    });
+    targets.push({
+      name: `4. Groq GPT-OSS 120B (Clé ${idx + 1})`,
+      baseURL: "https://api.groq.com/openai/v1",
+      apiKey: key,
+      model: process.env.GROQ_TEXT_FALLBACK_MODEL?.trim() || "openai/gpt-oss-120b",
+      isVision: false,
+    });
+  });
+
+  // 5. OpenRouter Free (Modèles 100% Gratuits)
+  const openRouterKeys = getKeysWithFallback("OPENROUTER_API_KEY");
+  openRouterKeys.forEach((key, idx) => {
+    targets.push({
+      name: `5. OpenRouter Gemma 4 31B Free (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "google/gemma-4-31b-it:free",
+      isVision: false,
+    });
+    targets.push({
+      name: `6. OpenRouter Nemotron 3.5 Lightning Free (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "nvidia/nemotron-3.5-lightning:free",
+      isVision: false,
+    });
+  });
+
+  // 10. OpenRouter DeepSeek V3 / Chat Free
+  const orDeepSeekV3 = getKeysWithFallback("OPENROUTER_DEEPSEEK_V3_KEY", "OPENROUTER_API_KEY");
+  orDeepSeekV3.forEach((key, idx) => {
+    targets.push({
+      name: `10. OpenRouter DeepSeek V3 Free (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "deepseek/deepseek-chat:free",
+      isVision: false,
+    });
+  });
+
+  // 11. OpenRouter DeepSeek R1 Free
+  const orDeepSeekR1 = getKeysWithFallback("OPENROUTER_DEEPSEEK_R1_KEY", "OPENROUTER_API_KEY");
+  orDeepSeekR1.forEach((key, idx) => {
+    targets.push({
+      name: `11. OpenRouter DeepSeek R1 Free (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "deepseek/deepseek-r1:free",
+      isVision: false,
+    });
+  });
+
+  // 12. OpenRouter Qwen 2.5 72B Free
+  const orQwen = getKeysWithFallback("OPENROUTER_QWEN_KEY", "OPENROUTER_API_KEY");
+  orQwen.forEach((key, idx) => {
+    targets.push({
+      name: `12. OpenRouter Qwen 2.5 72B Free (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "qwen/qwen-2.5-72b-instruct:free",
+      isVision: false,
+    });
+  });
+
+  // 13. OpenRouter Qwen 2.5 Coder 32B Free
+  const orQwenCoder = getKeysWithFallback("OPENROUTER_QWEN_CODER_KEY", "OPENROUTER_API_KEY");
+  orQwenCoder.forEach((key, idx) => {
+    targets.push({
+      name: `13. OpenRouter Qwen 2.5 Coder Free (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "qwen/qwen-2.5-coder-32b-instruct:free",
+      isVision: false,
+    });
+  });
+
+  // 14. OpenRouter Mistral 7B Free
+  const orMistral = getKeysWithFallback("OPENROUTER_MISTRAL_FREE_KEY", "OPENROUTER_API_KEY");
+  orMistral.forEach((key, idx) => {
+    targets.push({
+      name: `14. OpenRouter Mistral 7B Free (Clé ${idx + 1})`,
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: key,
+      model: "mistralai/mistral-7b-instruct:free",
+      isVision: false,
+    });
+  });
+
+  // 15. Mistral Small
+  const mistralSmallKeys = getKeysWithFallback("MISTRAL_API_KEY");
+  mistralSmallKeys.forEach((key, idx) => {
+    targets.push({
+      name: `15. Mistral Small (Clé ${idx + 1})`,
       baseURL: "https://api.mistral.ai/v1",
       apiKey: key,
       model: "mistral-small-latest",
@@ -185,37 +325,134 @@ function getTextTargets(): ProviderTarget[] {
     });
   });
 
-  // 3. OpenRouter Gemini 2.5 Flash
-  const openRouterKeys = getApiKeys("OPENROUTER_API_KEY");
-  openRouterKeys.forEach((key, idx) => {
+  // 16 & 17. Mistral Codestral
+  const mistralCodestralKeys = getKeysWithFallback("MISTRAL_CODESTRAL_KEY", "MISTRAL_API_KEY");
+  mistralCodestralKeys.forEach((key, idx) => {
     targets.push({
-      name: `OpenRouter Gemini 2.5 Flash (Clé ${idx + 1})`,
-      baseURL: "https://openrouter.ai/api/v1",
+      name: `17. Mistral Codestral (Clé ${idx + 1})`,
+      baseURL: "https://api.mistral.ai/v1",
       apiKey: key,
-      model: "google/gemini-2.5-flash",
+      model: "codestral-latest",
       isVision: false,
     });
   });
 
-  // 4. Google Gemini Direct
-  const geminiKeys = getApiKeys("GEMINI_API_KEY").concat(
-    getApiKeys("GOOGLE_GENERATIVE_AI_API_KEY")
-  );
-  geminiKeys.forEach((key, idx) => {
+  // 18. SambaNova Llama 3.3 70B
+  const sambaKeys = getKeysWithFallback("SAMBANOVA_API_KEY");
+  sambaKeys.forEach((key, idx) => {
     targets.push({
-      name: `Google Gemini 1.5 Flash (Clé ${idx + 1})`,
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      name: `18. SambaNova Llama 3.3 70B (Clé ${idx + 1})`,
+      baseURL: "https://api.sambanova.ai/v1",
       apiKey: key,
-      model: "gemini-1.5-flash",
+      model: "Meta-Llama-3.3-70B-Instruct",
       isVision: false,
     });
   });
 
-  // 5. OpenAI
-  const openAiKeys = getApiKeys("OPENAI_API_KEY");
+  // 19. SambaNova DeepSeek R1
+  const sambaDeepSeek = getKeysWithFallback("SAMBANOVA_DEEPSEEK_KEY", "SAMBANOVA_API_KEY");
+  sambaDeepSeek.forEach((key, idx) => {
+    targets.push({
+      name: `19. SambaNova DeepSeek R1 (Clé ${idx + 1})`,
+      baseURL: "https://api.sambanova.ai/v1",
+      apiKey: key,
+      model: "DeepSeek-R1-Distill-Llama-70B",
+      isVision: false,
+    });
+  });
+
+  // 20. SambaNova Qwen 2.5 72B
+  const sambaQwen = getKeysWithFallback("SAMBANOVA_QWEN_KEY", "SAMBANOVA_API_KEY");
+  sambaQwen.forEach((key, idx) => {
+    targets.push({
+      name: `20. SambaNova Qwen 2.5 72B (Clé ${idx + 1})`,
+      baseURL: "https://api.sambanova.ai/v1",
+      apiKey: key,
+      model: "Qwen2.5-72B-Instruct",
+      isVision: false,
+    });
+  });
+
+  // 21. Cerebras Llama 3.3 70B
+  const cerebrasKeys = getKeysWithFallback("CEREBRAS_API_KEY");
+  cerebrasKeys.forEach((key, idx) => {
+    targets.push({
+      name: `21. Cerebras Llama 3.3 70B (Clé ${idx + 1})`,
+      baseURL: "https://api.cerebras.ai/v1",
+      apiKey: key,
+      model: "llama-3.3-70b",
+      isVision: false,
+    });
+  });
+
+  // 22. Cerebras Llama 3.1 8B
+  const cerebras8bKeys = getKeysWithFallback("CEREBRAS_LLAMA31_KEY", "CEREBRAS_API_KEY");
+  cerebras8bKeys.forEach((key, idx) => {
+    targets.push({
+      name: `22. Cerebras Llama 3.1 8B (Clé ${idx + 1})`,
+      baseURL: "https://api.cerebras.ai/v1",
+      apiKey: key,
+      model: "llama3.1-8b",
+      isVision: false,
+    });
+  });
+
+  // 23. GitHub Models GPT-4o-mini
+  const githubTokens = getKeysWithFallback("GITHUB_TOKEN");
+  githubTokens.forEach((key, idx) => {
+    targets.push({
+      name: `23. GitHub Models GPT-4o-mini (Clé ${idx + 1})`,
+      baseURL: "https://models.inference.ai.azure.com",
+      apiKey: key,
+      model: "gpt-4o-mini",
+      isVision: false,
+    });
+  });
+
+  // 24. GitHub Models Phi-4 / Phi-3.5
+  const githubPhiTokens = getKeysWithFallback("GITHUB_PHI_TOKEN", "GITHUB_TOKEN");
+  githubPhiTokens.forEach((key, idx) => {
+    targets.push({
+      name: `24. GitHub Models Phi-3.5-mini (Clé ${idx + 1})`,
+      baseURL: "https://models.inference.ai.azure.com",
+      apiKey: key,
+      model: "Phi-3.5-mini-instruct",
+      isVision: false,
+    });
+  });
+
+  // 25. Cohere Command R
+  const cohereKeys = getKeysWithFallback("COHERE_API_KEY");
+  cohereKeys.forEach((key, idx) => {
+    targets.push({
+      name: `25. Cohere Command R (Clé ${idx + 1})`,
+      baseURL: "https://api.cohere.com/compatibility/v1",
+      apiKey: key,
+      model: "command-r",
+      isVision: false,
+    });
+  });
+
+  // 26. Cloudflare Workers AI
+  const cloudflareKeys = getKeysWithFallback("CLOUDFLARE_API_KEY");
+  const cloudflareAccount = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  if (cloudflareAccount && cloudflareKeys.length > 0) {
+    cloudflareKeys.forEach((key, idx) => {
+      targets.push({
+        name: `26. Cloudflare Workers AI Llama 3.1 (Clé ${idx + 1})`,
+        baseURL: `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccount}/ai/v1`,
+        apiKey: key,
+        model: "@cf/meta/llama-3.1-8b-instruct",
+        isVision: false,
+      });
+    });
+  }
+
+  // 27. OpenAI GPT-4o-mini (Ultime secours payant)
+  const openAiKeys = getKeysWithFallback("OPENAI_API_KEY");
   openAiKeys.forEach((key, idx) => {
     targets.push({
-      name: `OpenAI gpt-4o-mini (Clé ${idx + 1})`,
+      name: `27. OpenAI gpt-4o-mini (Clé ${idx + 1})`,
       apiKey: key,
       model: "gpt-4o-mini",
       isVision: false,
@@ -237,11 +474,11 @@ async function executeWithWaterfall(
     return {
       success: false,
       error:
-        "Aucun fournisseur d'IA configuré. Veuillez définir au moins une clé API (GEMINI_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY ou OPENAI_API_KEY).",
+        "Le service d'IA n'est pas configuré. Une clé API active doit être définie dans les variables d'environnement du serveur.",
     };
   }
 
-  const errors: string[] = [];
+  const failures: Array<{ status: number | null }> = [];
 
   for (const target of targets) {
     try {
@@ -250,7 +487,8 @@ async function executeWithWaterfall(
       const client = new OpenAI({
         apiKey: target.apiKey,
         baseURL: target.baseURL,
-        timeout: 25000, // 25 secondes max par fournisseur
+        timeout: 15000,
+        maxRetries: 0,
       });
 
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -298,16 +536,25 @@ async function executeWithWaterfall(
         providerUsed: target.name,
       };
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.warn(`[AI Multi-Relais] ⚠️ Échec de ${target.name}: ${errMsg}`);
-      errors.push(`${target.name}: ${errMsg}`);
+      const status =
+        err instanceof OpenAI.APIError && typeof err.status === "number" ? err.status : null;
+      console.warn(`[AI Multi-Relais] Échec de ${target.name} (HTTP ${status ?? "inconnu"}).`);
+      failures.push({ status });
       // Continue automatiquement à la cible suivante
     }
   }
 
+  const statuses = failures.map((failure) => failure.status);
+  const allCredentialsRejected =
+    statuses.length > 0 && statuses.every((status) => status === 401 || status === 403);
+  const quotaRejected = statuses.some((status) => status === 429);
   return {
     success: false,
-    error: `Toutes les options IA ont échoué. Détails : ${errors.slice(0, 3).join(" | ")}`,
+    error: allCredentialsRejected
+      ? "Les clés API IA configurées sont refusées. Vérifiez-les et remplacez toute clé invalide dans les variables d'environnement du serveur."
+      : quotaRejected
+        ? "Le quota des fournisseurs d'IA configurés est temporairement atteint. Réessayez plus tard ou ajoutez un fournisseur avec une clé active."
+        : "Les fournisseurs d'IA configurés sont indisponibles. Vérifiez les clés et modèles côté serveur, puis réessayez.",
   };
 }
 
@@ -335,6 +582,8 @@ Description de l'utilisateur :
 """
 ${description}
 """
+
+Les montants sont en FCFA. Un point séparant trois chiffres, par exemple "15.000" ou "15.000fcfa" ou "15.000f" ou "15000fcfa", est un séparateur de milliers et signifie 15000 en valeur numérique pure. Le prix explicitement indiqué par l'utilisateur est toujours prioritaire sur le catalogue. Le catalogue sert uniquement à reconnaître un article ou compléter un prix absent. Ne rajoute aucun article qui n'est pas demandé.
 
 N'invente jamais un nom de client, un article, une quantité ou un prix. Si le nom d'un article ou son prix est absent ou ambigu, ne l'ajoute pas aux lignes. Retourne une liste "items" vide si aucune ligne complète et exploitable ne peut être extraite.`;
 
@@ -365,6 +614,8 @@ Analyse minutieusement cette image et extrais uniquement les données utiles :
 
 Ignore tout bruit OCR, logo ou ligne de titre générique.
 Pour chaque ligne, distingue la quantité, le prix unitaire et le total de ligne. Si seul le total de ligne est lisible et la quantité est connue, calcule le prix unitaire uniquement si le total est divisible sans ambiguïté par la quantité. Si la quantité est absente, utilise 1 et traite le montant lisible comme le prix unitaire. Ne place jamais le texte complet du document, le nom du client ou une instruction dans "designation".
+Les montants sont en FCFA. Un point séparant trois chiffres, par exemple "15.000" ou "15.000fcfa" ou "15.000f" ou "15000fcfa", est un séparateur de milliers et signifie 15000 en valeur numérique pure. Le prix lisible sur le document est toujours prioritaire sur le catalogue. Le catalogue sert uniquement à reconnaître un article ou compléter un prix absent. Ne rajoute aucun article qui n'est pas présent sur l'image.
+
 N'invente jamais un nom, un prix ou une quantité. Si un prix est illisible et absent du catalogue, ne retourne pas cette ligne. Si aucune ligne complète n'est lisible, retourne "items": [].
 
 Réponds STRICTEMENT avec ce format JSON valide, sans aucun texte autour :

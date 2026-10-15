@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { getSiteUrl } from "@/lib/site-url";
 
 export const runtime = "nodejs";
@@ -13,7 +14,22 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = await createClient();
+    const cookieStore = await cookies();
+    const pendingCookies: Array<{ name: string; value: string; options: CookieOptions }> = [];
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            pendingCookies.push(...cookiesToSet);
+          },
+        },
+      }
+    );
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -21,9 +37,17 @@ export async function GET(request: Request) {
       },
     });
 
+    const redirectWithCookies = (url: URL) => {
+      const response = NextResponse.redirect(url);
+      for (const cookie of pendingCookies) {
+        response.cookies.set(cookie.name, cookie.value, cookie.options);
+      }
+      return response;
+    };
+
     if (error || !data.url) {
       console.error("Impossible de démarrer l'authentification Google:", error?.message);
-      return NextResponse.redirect(
+      return redirectWithCookies(
         new URL(
           `/login?error=${encodeURIComponent("Impossible de démarrer la connexion Google.")}`,
           siteUrl
@@ -31,7 +55,7 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.redirect(data.url);
+    return redirectWithCookies(new URL(data.url));
   } catch (error) {
     console.error("Erreur au démarrage OAuth Google:", error);
     return NextResponse.redirect(

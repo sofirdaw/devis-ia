@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { formatCurrency, formatDate, cn } from "../utils";
+import { getRemainingSubscriptionDays } from "../subscription";
 
 describe("Utils & Calculs", () => {
   it("formate correctement la monnaie en FCFA", () => {
@@ -27,5 +28,11 @@ describe("Utils & Calculs", () => {
     expect(classes).toContain("active");
     expect(classes).not.toContain("hidden");
     expect(classes).toContain("text-red-500");
+  });
+
+  it("calcule le nombre total de jours jusqu'à l'expiration de l'abonnement", () => {
+    expect(
+      getRemainingSubscriptionDays("2026-12-14T00:00:00.000Z", new Date("2026-10-15T00:00:00.000Z"))
+    ).toBe(60);
   });
 });

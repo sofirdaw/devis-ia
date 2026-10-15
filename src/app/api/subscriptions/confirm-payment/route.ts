@@ -5,8 +5,17 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const { requestId } = (await request.json()) as { requestId?: string };
-    if (!requestId) return NextResponse.json({ error: "Demande invalide." }, { status: 400 });
+    const { requestId, transactionReference } = (await request.json()) as {
+      requestId?: string;
+      transactionReference?: string;
+    };
+    const reference = transactionReference?.trim();
+    if (!requestId || !reference || reference.length < 4 || reference.length > 80) {
+      return NextResponse.json(
+        { error: "Saisissez une référence de transaction valide (4 à 80 caractères)." },
+        { status: 400 }
+      );
+    }
 
     const supabase = await createClient();
     const {
@@ -42,16 +51,57 @@ export async function POST(request: Request) {
         { error: "Cette demande ne peut plus être confirmée." },
         { status: 409 }
       );
-    if (payment.user_confirmed_at)
+    if (payment.user_confirmed_at) {
+      const { data: confirmedPayment, error: referenceError } = await supabase
+        .from("subscription_payments")
+        .select("orange_transaction_id")
+        .eq("id", requestId)
+        .eq("company_id", company.id)
+        .maybeSingle();
+      if (referenceError) {
+        return NextResponse.json(
+          { error: "Impossible de vérifier la référence." },
+          { status: 500 }
+        );
+      }
+      if (confirmedPayment?.orange_transaction_id !== reference) {
+        return NextResponse.json(
+          { error: "Cette demande a déjà été envoyée avec une autre référence." },
+          { status: 409 }
+        );
+      }
       return NextResponse.json({ success: true, alreadyConfirmed: true });
+    }
 
-    const { error: updateError } = await supabase
+    const { data: updatedPayment, error: updateError } = await supabase
       .from("subscription_payments")
-      .update({ user_confirmed_at: new Date().toISOString() })
+      .update({
+        orange_transaction_id: reference,
+        user_confirmed_at: new Date().toISOString(),
+      })
       .eq("id", requestId)
       .eq("company_id", company.id)
-      .is("user_confirmed_at", null);
+      .is("user_confirmed_at", null)
+      .select("orange_transaction_id")
+      .maybeSingle();
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+    if (!updatedPayment) {
+      const { data: currentPayment, error: currentPaymentError } = await supabase
+        .from("subscription_payments")
+        .select("orange_transaction_id")
+        .eq("id", requestId)
+        .eq("company_id", company.id)
+        .maybeSingle();
+      if (currentPaymentError) {
+        return NextResponse.json({ error: "Impossible de vérifier la demande." }, { status: 500 });
+      }
+      if (currentPayment?.orange_transaction_id !== reference) {
+        return NextResponse.json(
+          { error: "Cette demande a déjà été envoyée avec une autre référence." },
+          { status: 409 }
+        );
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

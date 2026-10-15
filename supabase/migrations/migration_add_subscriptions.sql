@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS subscription_payments (
 );
 
 ALTER TABLE subscription_payments
+  ADD COLUMN IF NOT EXISTS orange_transaction_id TEXT,
   ADD COLUMN IF NOT EXISTS payment_request_expires_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS user_confirmed_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS activation_code_hash TEXT,
@@ -93,14 +94,16 @@ CREATE INDEX IF NOT EXISTS idx_subscription_activations_company
 ALTER TABLE subscription_payments ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "subscription payments via company" ON subscription_payments;
+DROP POLICY IF EXISTS "subscription payments insert via company" ON subscription_payments;
+DROP POLICY IF EXISTS "subscription payments update via company" ON subscription_payments;
 CREATE POLICY "subscription payments via company" ON subscription_payments FOR SELECT
-  USING (company_id IN (SELECT id FROM companies WHERE user_id = auth.uid()));
+  USING (company_id IN (SELECT id FROM companies WHERE user_id::TEXT = auth.uid()::TEXT));
 
 DROP POLICY IF EXISTS "subscription payments insert via company" ON subscription_payments;
 CREATE POLICY "subscription payments insert via company" ON subscription_payments FOR INSERT
-  WITH CHECK (company_id IN (SELECT id FROM companies WHERE user_id = auth.uid()));
+  WITH CHECK (company_id IN (SELECT id FROM companies WHERE user_id::TEXT = auth.uid()::TEXT));
 
 DROP POLICY IF EXISTS "subscription payments update via company" ON subscription_payments;
 CREATE POLICY "subscription payments update via company" ON subscription_payments FOR UPDATE
-  USING (company_id IN (SELECT id FROM companies WHERE user_id = auth.uid()))
-  WITH CHECK (company_id IN (SELECT id FROM companies WHERE user_id = auth.uid()));
+  USING (company_id IN (SELECT id FROM companies WHERE user_id::TEXT = auth.uid()::TEXT))
+  WITH CHECK (company_id IN (SELECT id FROM companies WHERE user_id::TEXT = auth.uid()::TEXT));

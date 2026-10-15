@@ -30,15 +30,17 @@ export { openaiVision };
 
 /**
  * Modèle GPT utilisé pour la génération de documents
- * Utilise Llama 3.3 de Groq (gratuit et très performant)
+ * Utilise le modèle GPT-OSS de Groq par défaut.
  */
-export const AI_MODEL = process.env.GROQ_API_KEY ? "llama-3.3-70b-versatile" : "gpt-4o-mini";
+export const AI_MODEL = process.env.GROQ_API_KEY
+  ? process.env.GROQ_TEXT_MODEL?.trim() || "openai/gpt-oss-20b"
+  : "gpt-4o-mini";
 
 /**
  * Modèle GPT utilisé pour l'analyse d'image (vision)
  * Utilise gpt-4o-mini d'OpenAI qui supporte la vision
  */
-export const AI_VISION_MODEL = "gpt-4o-mini";
+export const AI_VISION_MODEL = process.env.GEMINI_VISION_MODEL?.trim() || "gemini-3.8-flash";
 
 /**
  * Prompt système de base pour la génération de devis/factures

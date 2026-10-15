@@ -144,6 +144,14 @@ export function parseDocumentOfflineText(
     .replace(/^[:\-–=,\.]\s*/, "")
     .trim();
 
+  const totalQuantityMatch = workingText.match(
+    /\b(?:avec\s+)?(?:pour\s+)?(?:un\s+)?total(?:\s+de)?\s+(\d+)\s*(?:pi[eè]ces?|pcs?|unit[eé]s?|articles?)\b/i
+  );
+  const totalQuantity = totalQuantityMatch ? Number(totalQuantityMatch[1]) : null;
+  if (totalQuantityMatch) {
+    workingText = workingText.replace(totalQuantityMatch[0], " ").trim();
+  }
+
   // 2. Découpage en segments d'articles
   const rawSegments = workingText
     .split(
@@ -201,6 +209,10 @@ export function parseDocumentOfflineText(
   // Si aucun article trouvé avec prix, tenter un matching direct sur l'ensemble du texte
   if (items.length === 0 && workingText) {
     parseSingleItemCandidate(workingText, items, products);
+  }
+
+  if (items.length === 1 && totalQuantity && Number.isSafeInteger(totalQuantity)) {
+    items[0].quantity = totalQuantity;
   }
 
   if (items.length === 0) {
@@ -319,6 +331,12 @@ function parseSingleItemCandidate(
 ) {
   let clean = line.trim();
   const lower = clean.toLowerCase();
+  if (
+    /^(?:crée|cree|génère|genere|prépare|prepare)\b/i.test(clean) ||
+    /^(?:devis|facture)\s+pour\b/i.test(clean)
+  ) {
+    return;
+  }
 
   if (clean.includes("\n")) {
     const blockLines = clean
@@ -354,10 +372,8 @@ function parseSingleItemCandidate(
 
       const baseDesignation = normalizedName || designationLine;
       const finalDesignation = applyAutoCorrections(baseDesignation);
-      const matchedProduct = products.find(
-        (p) => p.name.toLowerCase() === finalDesignation.toLowerCase()
-      );
-      const finalPrice = matchedProduct?.price ?? unitPrice;
+      const matchedProduct = findCatalogProduct(products, finalDesignation);
+      const finalPrice = unitPrice > 0 ? unitPrice : (matchedProduct?.price ?? 0);
 
       if (!finalDesignation || finalDesignation.length < 2) return;
       if (finalPrice <= 0 && !matchedProduct) return;
@@ -407,9 +423,24 @@ function parseSingleItemCandidate(
     quantity = parseInt(numQtyMatch[1], 10);
     clean = clean.slice(numQtyMatch[0].length).trim();
   } else {
-    const wordQtyMatch = clean.match(/^(?:un|une|le|la|les|des|d'|l')\s+/i);
+    const wordQtyMatch = clean.match(
+      /^(un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|le|la|les|des|d'|l')\s+/i
+    );
     if (wordQtyMatch) {
-      quantity = 1;
+      const wordQuantities: Record<string, number> = {
+        un: 1,
+        une: 1,
+        deux: 2,
+        trois: 3,
+        quatre: 4,
+        cinq: 5,
+        six: 6,
+        sept: 7,
+        huit: 8,
+        neuf: 9,
+        dix: 10,
+      };
+      quantity = wordQuantities[wordQtyMatch[1].toLowerCase()] ?? 1;
       clean = clean.slice(wordQtyMatch[0].length).trim();
     }
   }
@@ -417,7 +448,7 @@ function parseSingleItemCandidate(
   // 3. Extraction du prix unitaire
   let unitPrice = 0;
   const priceRegex =
-    /(?:à|au prix de|pour|coûtant|coûte|prix\s*:?|:|@)?\s*(\d{1,3}(?:[\s\.]\d{3})+|\d+k?)\s*(?:fcfa|cfa|f|frs?|francs?|\$|€)?(?:\s*(?:chacun(?:e)?|l['’]un(?:e)?|par\s+(?:unité|piece))?)\s*$/i;
+    /(?:à|au prix de|pour|coûtant|coûte|prix\s*:?|:|@)?\s*(\d{1,3}(?:[\s.\u00A0]\d{3})+|\d+k?)\s*(?:fcfa|cfa|f|frs?|francs?|\$|€)?(?:\s*(?:chacun(?:e)?|l['’]un(?:e)?|l['’]unit[eé]|par\s+(?:unit[eé]|pi[eè]ce)|unit[eé]))?\.?\s*$/i;
 
   const priceMatch = clean.match(priceRegex);
   if (priceMatch && priceMatch[1]) {
@@ -463,11 +494,9 @@ function parseSingleItemCandidate(
   rawDesignation = applyAutoCorrections(rawDesignation);
 
   // 6. Correspondance produit
-  const matchedProduct = products.find(
-    (p) => p.name.toLowerCase() === rawDesignation.toLowerCase()
-  );
+  const matchedProduct = findCatalogProduct(products, rawDesignation);
 
-  const finalPrice = matchedProduct?.price ?? unitPrice;
+  const finalPrice = unitPrice > 0 ? unitPrice : (matchedProduct?.price ?? 0);
 
   // Si le prix est 0 et que le produit n'existe pas au catalogue, ignorer
   if (finalPrice <= 0 && !matchedProduct) {
@@ -480,6 +509,21 @@ function parseSingleItemCandidate(
     quantity: Math.max(1, quantity),
     unit_price: finalPrice,
   });
+}
+
+function findCatalogProduct(products: Product[], designation: string) {
+  const normalize = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .trim()
+      .split(/\s+/)
+      .map((word) => (word.length > 3 ? word.replace(/s$/, "") : word))
+      .join(" ");
+  const normalizedDesignation = normalize(designation);
+  return products.find((product) => normalize(product.name) === normalizedDesignation);
 }
 
 /**
