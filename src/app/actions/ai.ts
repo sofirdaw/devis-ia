@@ -117,9 +117,39 @@ function sanitizeAIItems(
   products: Product[],
   allowTextFallback = true
 ): Array<{ product_id: string | null; designation: string; quantity: number; unit_price: number }> {
-  const hasMalformed = items.some((item) => looksLikeMalformedAIItem(item));
-  if (hasMalformed) {
-    if (!allowTextFallback) return [];
+  const normalizedName = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
+
+  // Filtrer et sanitiser chaque item individuellement
+  const sanitized = items
+    .filter((item) => !looksLikeMalformedAIItem(item))
+    .map((item) => {
+      const designation = item.designation.trim();
+      const matchedProduct = products.find(
+        (product) => normalizedName(product.name) === normalizedName(designation)
+      );
+      const parsedUnitPrice = parseAIAmount(item.unit_price);
+      const unitPrice =
+        Number.isFinite(parsedUnitPrice) && parsedUnitPrice > 0
+          ? parsedUnitPrice
+          : matchedProduct?.price || 0;
+      const parsedQuantity = Number(item.quantity);
+
+      return {
+        product_id: matchedProduct?.id ?? item.product_id ?? null,
+        designation: matchedProduct?.name ?? designation,
+        quantity: Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1,
+        unit_price: unitPrice,
+      };
+    })
+    .filter((item) => item.designation && item.unit_price > 0);
+
+  // Si aucun item valide extrait et que la description est fournie, tenter le fallback local
+  if (sanitized.length === 0 && allowTextFallback && description) {
     const parserClients: Client[] = clients.map((client) => ({
       id: client.id,
       company_id: "",
@@ -130,42 +160,15 @@ function sanitizeAIItems(
       created_at: "",
     }));
     const fallback = parseDocumentOfflineText(description, parserClients, products);
-    if (!fallback.success || !fallback.data) return [];
-
-    return fallback.data.items.map((item) => ({
-      ...item,
-      product_id: item.product_id ?? null,
-    }));
+    if (fallback.success && fallback.data) {
+      return fallback.data.items.map((item) => ({
+        ...item,
+        product_id: item.product_id ?? null,
+      }));
+    }
   }
 
-  const normalizedName = (value: string) =>
-    value
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .trim()
-      .toLowerCase();
-
-  const sanitized = items.map((item) => {
-    const designation = item.designation.trim();
-    const matchedProduct = products.find(
-      (product) => normalizedName(product.name) === normalizedName(designation)
-    );
-    const parsedUnitPrice = parseAIAmount(item.unit_price);
-    const unitPrice =
-      Number.isFinite(parsedUnitPrice) && parsedUnitPrice > 0
-        ? parsedUnitPrice
-        : matchedProduct?.price || 0;
-    const parsedQuantity = Number(item.quantity);
-
-    return {
-      product_id: matchedProduct?.id ?? item.product_id ?? null,
-      designation: matchedProduct?.name ?? designation,
-      quantity: Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 1,
-      unit_price: unitPrice,
-    };
-  });
-
-  return sanitized.every((item) => item.designation && item.unit_price > 0) ? sanitized : [];
+  return sanitized;
 }
 
 // ── Action principale : extraction IA depuis un texte libre ───────────────────
@@ -183,6 +186,63 @@ export async function generateDocumentFromText(description: string): Promise<AIE
     };
   }
 
+  // ── Appel IA en priorité (extraction intelligente) ──────────────────────────
+  const systemPrompt = SYSTEM_PROMPT_BASE + buildCatalogContext(context.products as Product[]);
+  const result = await extractDocumentFromTextWithFallback(description, systemPrompt);
+
+  if (result.success && result.data) {
+    const parsed = result.data;
+
+    if (!parsed.items || parsed.items.length === 0) {
+      return {
+        success: false,
+        error: "Aucun article détecté dans votre description",
+      };
+    }
+
+    // ── Recherche du client en base (correspondance floue insensible à la casse) ──
+    const matchedClient = parsed.client_name
+      ? context.clients.find(
+          (c) =>
+            c.name.toLowerCase().includes(parsed.client_name.toLowerCase()) ||
+            parsed.client_name.toLowerCase().includes(c.name.toLowerCase())
+        )
+      : undefined;
+
+    // ── Faire correspondre chaque ligne à un produit existant si possible ──────
+    const items = sanitizeAIItems(
+      parsed.items.map((item) => ({
+        product_id: null,
+        designation: item.designation,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+      })),
+      description,
+      context.clients,
+      context.products as Product[]
+    );
+    if (!items.length) {
+      return {
+        success: false,
+        error:
+          "Impossible d'extraire un article avec un prix valide. Précisez le nom et le prix, ou vérifiez la photo.",
+      };
+    }
+
+    return {
+      success: true,
+      providerUsed: result.providerUsed,
+      data: {
+        clientName: parsed.client_name || "Client non spécifié",
+        matchedClientId: matchedClient?.id ?? null,
+        items,
+        notes: parsed.notes,
+        date: parsed.date,
+      },
+    };
+  }
+
+  // ── Fallback local uniquement si l'IA échoue (hors-ligne ou quota dépassé) ──
   const parserClients: Client[] = context.clients.map((client) => ({
     id: client.id,
     company_id: context.companyId,
@@ -200,70 +260,14 @@ export async function generateDocumentFromText(description: string): Promise<AIE
   if (localResult.success && localResult.data) {
     return {
       success: true,
-      providerUsed: "Analyse structurée locale",
+      providerUsed: "Analyse structurée locale (hors-ligne)",
       data: localResult.data,
     };
   }
 
-  const systemPrompt = SYSTEM_PROMPT_BASE + buildCatalogContext(context.products as Product[]);
-
-  const result = await extractDocumentFromTextWithFallback(description, systemPrompt);
-
-  if (!result.success || !result.data) {
-    return {
-      success: false,
-      error: result.error || "Erreur lors de la génération IA",
-    };
-  }
-
-  const parsed = result.data;
-
-  if (!parsed.items || parsed.items.length === 0) {
-    return {
-      success: false,
-      error: "Aucun article détecté dans votre description",
-    };
-  }
-
-  // ── Recherche du client en base (correspondance floue insensible à la casse) ──
-  const matchedClient = parsed.client_name
-    ? context.clients.find(
-        (c) =>
-          c.name.toLowerCase().includes(parsed.client_name.toLowerCase()) ||
-          parsed.client_name.toLowerCase().includes(c.name.toLowerCase())
-      )
-    : undefined;
-
-  // ── Faire correspondre chaque ligne à un produit existant si possible ────────
-  const items = sanitizeAIItems(
-    parsed.items.map((item) => ({
-      product_id: null,
-      designation: item.designation,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-    })),
-    description,
-    context.clients,
-    context.products as Product[]
-  );
-  if (!items.length) {
-    return {
-      success: false,
-      error:
-        "Impossible d'extraire un article avec un prix valide. Précisez le nom et le prix, ou vérifiez la photo.",
-    };
-  }
-
   return {
-    success: true,
-    providerUsed: result.providerUsed,
-    data: {
-      clientName: parsed.client_name || "Client non spécifié",
-      matchedClientId: matchedClient?.id ?? null,
-      items,
-      notes: parsed.notes,
-      date: parsed.date,
-    },
+    success: false,
+    error: result.error || "Erreur lors de la génération IA",
   };
 }
 
