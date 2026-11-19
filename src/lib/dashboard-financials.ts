@@ -6,7 +6,7 @@ type InvoiceRow = {
 };
 
 type ReceivableRow = {
-  invoice_id: string;
+  invoice_id: string | null;
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;

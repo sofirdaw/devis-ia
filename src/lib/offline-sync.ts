@@ -13,10 +13,12 @@ import {
   saveOfflineClient,
   saveOfflineProduct,
   saveOfflineSupplier,
+  saveOfflineReceivable,
   type OfflineClient,
   type OfflineInvoice,
   type OfflineProduct,
   type OfflineQuote,
+  type OfflineReceivable,
   type OfflineSupplier,
 } from "./offline-db";
 import {
@@ -102,6 +104,7 @@ function getMutationEntityId(item: { action: string; payload: Record<string, unk
     "local_supplier",
     "local_quote",
     "local_invoice",
+    "local_receivable",
   ];
   for (const key of localKeys) {
     const id = (item.payload[key] as { id?: unknown } | undefined)?.id;
@@ -359,9 +362,25 @@ async function runSync(): Promise<{ syncedCount: number }> {
           if (result?.error) throw new Error(result.error);
           await removeFromSyncQueue(item.id);
           syncedCount++;
+        } else if (item.action === "CREATE_RECEIVABLE") {
+          const formData = new FormData();
+          const localReceivable = p.local_receivable as OfflineReceivable | undefined;
+          formData.append("invoice_id", String(p.invoice_id ?? ""));
+          formData.append("total_amount", String(p.total_amount ?? 0));
+          formData.append("due_date", String(p.due_date ?? ""));
+          if (localReceivable?.id) formData.append("offline_sync_id", localReceivable.id);
+
+          const { createReceivableAction } = await import("@/app/actions/receivables");
+          const result = await createReceivableAction({}, formData);
+          if (result?.error) throw new Error(result.error);
+          if (localReceivable) {
+            await saveOfflineReceivable({ ...localReceivable, sync_status: "synced" });
+          }
+          await removeFromSyncQueue(item.id);
+          syncedCount++;
         } else if (item.action === "UPDATE_RECEIVABLE") {
           const formData = new FormData();
-          formData.append("total_amount", String(p.total_amount ?? ""));
+          formData.append("total_amount", String(p.total_amount ?? 0));
           formData.append("due_date", String(p.due_date ?? ""));
           const result = await updateReceivableAction(String(p.id ?? ""), {}, formData);
           if (result?.error) throw new Error(result.error);

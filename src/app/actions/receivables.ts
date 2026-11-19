@@ -27,6 +27,76 @@ async function getCurrentCompany() {
   return getCurrentCompanyForAction();
 }
 
+export async function createReceivableAction(
+  _prevState: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const invoiceId = String(formData.get("invoice_id") ?? "").trim();
+  const totalAmount = Number(formData.get("total_amount"));
+  const dueDate = String(formData.get("due_date") ?? "").trim() || null;
+  const offlineSyncId = String(formData.get("offline_sync_id") ?? "").trim() || undefined;
+
+  if (!invoiceId) return { error: "Facture requise" };
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+    return { error: "Le montant total doit être positif" };
+  }
+
+  const company = await getCurrentCompany();
+  if (!company) return { error: "Entreprise introuvable" };
+
+  const supabase = await createClient();
+  const { data: invoice, error: invoiceError } = await supabase
+    .from("invoices")
+    .select("id, client_id")
+    .eq("id", invoiceId)
+    .eq("company_id", company.id)
+    .maybeSingle();
+
+  if (invoiceError) {
+    console.error("Erreur de vérification de la facture:", invoiceError.message);
+    return { error: "Impossible de vérifier cette facture." };
+  }
+  if (!invoice) return { error: "Facture introuvable" };
+
+  if (offlineSyncId) {
+    const { data: existing, error: lookupError } = await supabase
+      .from("receivables")
+      .select("id")
+      .eq("offline_sync_id", offlineSyncId)
+      .maybeSingle();
+    if (lookupError) {
+      console.error("Erreur de vérification de la créance hors-ligne:", lookupError.message);
+      return { error: "Impossible de vérifier cette créance hors-ligne." };
+    }
+    if (existing) return { success: true };
+  }
+
+  const status =
+    dueDate && dueDate < new Date().toISOString().slice(0, 10) ? "overdue" : "pending";
+  const { error } = await supabase.from("receivables").insert({
+    company_id: company.id,
+    invoice_id: invoice.id,
+    client_id: invoice.client_id,
+    total_amount: totalAmount,
+    paid_amount: 0,
+    remaining_amount: totalAmount,
+    due_date: dueDate,
+    status,
+    ...(offlineSyncId ? { offline_sync_id: offlineSyncId } : {}),
+  });
+
+  if (error) {
+    console.error("Supabase error:", error);
+    return { error: `Erreur lors de la création de la créance: ${error.message}` };
+  }
+
+  revalidatePath("/receivables");
+  revalidatePath("/invoices");
+  revalidatePath("/dashboard");
+  await invalidateCache(dashboardCacheKey(company.id));
+  return { success: true };
+}
+
 // ── ADD PAYMENT ───────────────────────────────────────────────────────────────
 
 export async function addPaymentAction(

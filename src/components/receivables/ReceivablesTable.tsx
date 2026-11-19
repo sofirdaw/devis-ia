@@ -18,13 +18,14 @@ import Link from "next/link";
 import { ReceivableFormDialog } from "./ReceivableFormDialog";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { deleteReceivableAction } from "@/app/actions/receivables";
-import type { Receivable } from "@/types";
+import type { PaymentTransaction, Receivable } from "@/types";
 import {
   addToSyncQueue,
-  getOfflineSnapshot,
+  getOfflineReceivables,
   getSyncQueue,
-  removeFromSyncQueue,
-  saveOfflineSnapshot,
+  removeQueuedMutationsForEntity,
+  deleteOfflineReceivable,
+  type OfflineReceivable,
 } from "@/lib/offline-db";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -41,8 +42,9 @@ const statusConfig = {
 
 export function ReceivablesTable({ initialReceivables }: ReceivablesTableProps) {
   const [search, setSearch] = useState("");
-  const [cachedReceivables, setCachedReceivables] = useState<Receivable[]>([]);
-  const [snapshotLoaded, setSnapshotLoaded] = useState(false);
+  const [offlineReceivables, setOfflineReceivables] = useState<OfflineReceivable[]>([]);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
   const companyId = useAuthStore((state) => state.company?.id);
   const [editingReceivable, setEditingReceivable] = useState<Receivable | undefined>();
   const [deletingReceivable, setDeletingReceivable] = useState<Receivable | undefined>();
@@ -50,68 +52,109 @@ export function ReceivablesTable({ initialReceivables }: ReceivablesTableProps) 
   useEffect(() => {
     if (!companyId) return;
     let active = true;
-    const loadSnapshot = async () => {
-      const snapshot = await getOfflineSnapshot(companyId);
+    const loadOffline = async () => {
+      const [receivables, queue] = await Promise.all([getOfflineReceivables(), getSyncQueue()]);
       if (active) {
-        setCachedReceivables(snapshot?.receivables ?? []);
-        setSnapshotLoaded(Boolean(snapshot));
+        setOfflineReceivables(receivables.filter((r) => r.company_id === companyId));
+        setDeletedIds((current) => {
+          const queuedDeletes = new Set(
+            queue
+              .filter(
+                (item) => item.action === "DELETE_RECEIVABLE" && item.payload.company_id === companyId
+              )
+              .map((item) => String(item.payload.id))
+          );
+          return new Set([...current, ...queuedDeletes]);
+        });
       }
     };
-    void loadSnapshot();
-    window.addEventListener("pwa-offline-data-changed", loadSnapshot);
-    window.addEventListener("pwa-offline-snapshot-ready", loadSnapshot);
+    loadOffline();
+    window.addEventListener("pwa-offline-data-changed", loadOffline);
+    window.addEventListener("pwa-sync-complete", loadOffline);
     return () => {
       active = false;
-      window.removeEventListener("pwa-offline-data-changed", loadSnapshot);
-      window.removeEventListener("pwa-offline-snapshot-ready", loadSnapshot);
+      window.removeEventListener("pwa-offline-data-changed", loadOffline);
+      window.removeEventListener("pwa-sync-complete", loadOffline);
     };
   }, [companyId]);
 
   const receivables = useMemo(() => {
-    if (typeof navigator !== "undefined" && !navigator.onLine && snapshotLoaded) {
-      return cachedReceivables;
-    }
-    const ids = new Set(initialReceivables.map((item) => item.id));
-    return [...initialReceivables, ...cachedReceivables.filter((item) => !ids.has(item.id))];
-  }, [cachedReceivables, initialReceivables, snapshotLoaded]);
+    const serverIds = new Set(initialReceivables.map((item) => item.id));
+    const localRows: Receivable[] = offlineReceivables
+      .filter(
+        (r) =>
+          !deletedIds.has(r.id) &&
+          (!serverIds.has(r.id) ||
+            r.sync_status === "pending_create" ||
+            r.sync_status === "pending_update")
+      )
+      .map((r): Receivable => ({
+        id: r.id,
+        company_id: companyId ?? r.company_id ?? "",
+        invoice_id: r.invoice_id ?? null,
+        invoice: r.invoice_number && r.invoice_id
+          ? { id: r.invoice_id, invoice_number: r.invoice_number } as Receivable["invoice"]
+          : undefined,
+        client_id: r.client_id ?? null,
+        client: r.client_name && r.client_id
+          ? { id: r.client_id, name: r.client_name } as Receivable["client"]
+          : undefined,
+        total_amount: r.total_amount,
+        paid_amount: r.paid_amount,
+        remaining_amount: r.remaining_amount,
+        due_date: r.due_date ?? null,
+        status: r.status,
+        created_at: r.created_at,
+        updated_at: r.updated_at ?? r.created_at,
+        payment_transactions: (r.payment_transactions ?? []).map((payment) => ({
+          id: payment.id,
+          receivable_id: r.id,
+          offline_sync_id: null,
+          amount: payment.amount,
+          payment_method: payment.payment_method as PaymentTransaction["payment_method"],
+          payment_date: payment.payment_date,
+          reference: payment.reference ?? null,
+          notes: payment.notes ?? null,
+          created_at: r.created_at,
+        })),
+      }));
+    const localIds = new Set(localRows.map((r) => r.id));
+    return [...localRows, ...initialReceivables.filter((r) => !localIds.has(r.id) && !deletedIds.has(r.id))];
+  }, [companyId, deletedIds, initialReceivables, offlineReceivables]);
 
   const handleDeleteReceivable = async (receivable: Receivable) => {
-    if (navigator.onLine) return deleteReceivableAction(receivable.id);
-    if (!companyId) return { error: "Entreprise locale introuvable." };
-
-    try {
-      const [snapshot, queue] = await Promise.all([getOfflineSnapshot(companyId), getSyncQueue()]);
-      const local = snapshot?.receivables.find((item) => item.id === receivable.id);
-      if (!snapshot || !local) return { error: "Cette créance n'est pas disponible localement." };
-      const hasPendingPayment = queue.some(
-        (item) =>
-          item.action === "ADD_PAYMENT" &&
-          item.payload.receivable_id === receivable.id &&
-          item.payload.company_id === companyId
-      );
-      if ((local.payment_transactions?.length ?? 0) > 0 || hasPendingPayment) {
-        return { error: "Impossible de supprimer : des paiements sont associés à cette créance." };
+    setActionError(null);
+    if (navigator.onLine) {
+      const result = await deleteReceivableAction(receivable.id);
+      if (result.error) {
+        setActionError(result.error);
+        return;
       }
-
-      const queueId = await addToSyncQueue("DELETE_RECEIVABLE", {
-        company_id: companyId,
-        id: receivable.id,
-      });
-      try {
-        await saveOfflineSnapshot({
-          ...snapshot,
-          receivables: snapshot.receivables.filter((item) => item.id !== receivable.id),
-        });
-      } catch (error) {
-        await removeFromSyncQueue(queueId);
-        throw error;
-      }
+      setDeletingReceivable(undefined);
       return;
+    }
+
+    const queue = await getSyncQueue();
+    const pendingCreate = queue.find(
+      (item) =>
+        item.action === "CREATE_RECEIVABLE" &&
+        (item.payload.local_receivable as OfflineReceivable | undefined)?.id === receivable.id
+    );
+    try {
+      if (pendingCreate) {
+        await removeQueuedMutationsForEntity(["CREATE_RECEIVABLE", "UPDATE_RECEIVABLE"], receivable.id);
+      } else {
+        await addToSyncQueue("DELETE_RECEIVABLE", {
+          company_id: companyId,
+          id: receivable.id,
+        });
+      }
+      await deleteOfflineReceivable(receivable.id);
+      setDeletedIds((current) => new Set(current).add(receivable.id));
+      setDeletingReceivable(undefined);
     } catch (error) {
       console.error("Erreur de suppression locale de créance:", error);
-      return {
-        error: error instanceof Error ? error.message : "Impossible de supprimer cette créance.",
-      };
+      setActionError("Impossible de supprimer cette créance hors ligne.");
     }
   };
 
@@ -139,6 +182,14 @@ export function ReceivablesTable({ initialReceivables }: ReceivablesTableProps) 
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        {actionError && (
+          <div
+            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            role="alert"
+          >
+            {actionError}
+          </div>
+        )}
       </div>
 
       {/* État vide */}

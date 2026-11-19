@@ -11,7 +11,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { getOfflineInvoices, type OfflineInvoice } from "@/lib/offline-db";
+import {
+  getOfflineInvoices,
+  addToSyncQueue,
+  deleteOfflineInvoice,
+  getSyncQueue,
+  removeQueuedMutationsForEntity,
+  type OfflineInvoice,
+} from "@/lib/offline-db";
+import { deleteInvoiceAction } from "@/app/actions/invoices";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { Trash2 } from "lucide-react";
 import type { Invoice, InvoiceStatus, Client } from "@/types";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -31,12 +41,25 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [offlineInvoices, setOfflineInvoices] = useState<OfflineInvoice[]>([]);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingInvoice, setDeletingInvoice] = useState<Invoice | undefined>();
   const companyId = useAuthStore((state) => state.company?.id);
 
   useEffect(() => {
     const loadOffline = async () => {
-      const offline = await getOfflineInvoices();
+      const [offline, queue] = await Promise.all([getOfflineInvoices(), getSyncQueue()]);
       setOfflineInvoices(offline.filter((invoice) => invoice.company_id === companyId));
+      setDeletedIds((current) => {
+        const queuedDeletes = new Set(
+          queue
+            .filter(
+              (item) => item.action === "DELETE_INVOICE" && item.payload.company_id === companyId
+            )
+            .map((item) => String(item.payload.id))
+        );
+        return new Set([...current, ...queuedDeletes]);
+      });
     };
     loadOffline();
 
@@ -57,9 +80,10 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
     const formattedOffline: Invoice[] = offlineInvoices
       .filter(
         (off) =>
-          !serverIds.has(off.id) ||
-          off.sync_status === "pending_create" ||
-          off.sync_status === "pending_update"
+          !deletedIds.has(off.id) &&
+          (!serverIds.has(off.id) ||
+            off.sync_status === "pending_create" ||
+            off.sync_status === "pending_update")
       )
       .map(
         (off) =>
@@ -90,8 +114,8 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
           }) as Invoice
       );
     const localIds = new Set(formattedOffline.map((invoice) => invoice.id));
-    return [...formattedOffline, ...invoices.filter((invoice) => !localIds.has(invoice.id))];
-  }, [invoices, offlineInvoices]);
+    return [...formattedOffline, ...invoices.filter((invoice) => !localIds.has(invoice.id) && !deletedIds.has(invoice.id))];
+  }, [invoices, offlineInvoices, deletedIds]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -119,6 +143,43 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
       return matchesStatus && matchesSearch;
     });
   }, [combinedInvoices, statusFilter, searchQuery]);
+
+  const handleDeleteInvoice = async () => {
+    if (!deletingInvoice) return;
+    setActionError(null);
+    if (navigator.onLine) {
+      const result = await deleteInvoiceAction(deletingInvoice.id);
+      if (result.error) {
+        setActionError(result.error);
+        return;
+      }
+      setDeletingInvoice(undefined);
+      return;
+    }
+
+    const queue = await getSyncQueue();
+    const pendingCreate = queue.find(
+      (item) =>
+        item.action === "CREATE_INVOICE" &&
+        (item.payload.local_invoice as OfflineInvoice | undefined)?.id === deletingInvoice.id
+    );
+    try {
+      if (pendingCreate) {
+        await removeQueuedMutationsForEntity(["CREATE_INVOICE", "UPDATE_INVOICE"], deletingInvoice.id);
+      } else {
+        await addToSyncQueue("DELETE_INVOICE", {
+          company_id: companyId,
+          id: deletingInvoice.id,
+        });
+      }
+      await deleteOfflineInvoice(deletingInvoice.id);
+      setDeletedIds((current) => new Set(current).add(deletingInvoice.id));
+      setDeletingInvoice(undefined);
+    } catch (error) {
+      console.error("Erreur de suppression locale de facture:", error);
+      setActionError("Impossible de supprimer cette facture hors ligne.");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -209,6 +270,15 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
         </div>
       </div>
 
+      {actionError && (
+        <div
+          className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          role="alert"
+        >
+          {actionError}
+        </div>
+      )}
+
       {filteredInvoices.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 py-12 lg:py-16 text-center shadow-sm">
           <Receipt size={32} className="text-gray-300 mx-auto mb-3" />
@@ -237,6 +307,9 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
                   </th>
                   <th className="text-right font-semibold text-gray-500 px-5 py-4 uppercase tracking-wider text-xs">
                     Montant
+                  </th>
+                  <th className="text-right font-semibold text-gray-500 px-5 py-4 uppercase tracking-wider text-xs">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -274,12 +347,33 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
                         </div>
                       )}
                     </td>
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end gap-1">
+                        <button
+                          onClick={() => setDeletingInvoice(invoice)}
+                          className="p-1.5 min-h-9 min-w-9 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          aria-label="Supprimer"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
+      )}
+
+      {deletingInvoice && (
+        <ConfirmDialog
+          open={!!deletingInvoice}
+          onOpenChange={(open) => !open && setDeletingInvoice(undefined)}
+          title="Supprimer cette facture ?"
+          description={`La facture "${deletingInvoice.invoice_number}" sera définitivement supprimée. Cette action est irréversible.`}
+          onConfirm={handleDeleteInvoice}
+        />
       )}
     </div>
   );

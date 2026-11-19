@@ -11,7 +11,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { getOfflineQuotes, type OfflineQuote } from "@/lib/offline-db";
+import {
+  getOfflineQuotes,
+  addToSyncQueue,
+  deleteOfflineQuote,
+  getSyncQueue,
+  removeQueuedMutationsForEntity,
+  type OfflineQuote,
+} from "@/lib/offline-db";
+import { deleteQuoteAction } from "@/app/actions/quotes";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { Trash2 } from "lucide-react";
 import type { Quote, QuoteStatus } from "@/types";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -32,12 +42,25 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [offlineQuotes, setOfflineQuotes] = useState<OfflineQuote[]>([]);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingQuote, setDeletingQuote] = useState<Quote | undefined>();
   const companyId = useAuthStore((state) => state.company?.id);
 
   useEffect(() => {
     const loadOffline = async () => {
-      const offline = await getOfflineQuotes();
+      const [offline, queue] = await Promise.all([getOfflineQuotes(), getSyncQueue()]);
       setOfflineQuotes(offline.filter((quote) => quote.company_id === companyId));
+      setDeletedIds((current) => {
+        const queuedDeletes = new Set(
+          queue
+            .filter(
+              (item) => item.action === "DELETE_QUOTE" && item.payload.company_id === companyId
+            )
+            .map((item) => String(item.payload.id))
+        );
+        return new Set([...current, ...queuedDeletes]);
+      });
     };
     loadOffline();
 
@@ -58,9 +81,10 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
     const formattedOffline: Quote[] = offlineQuotes
       .filter(
         (off) =>
-          !serverIds.has(off.id) ||
-          off.sync_status === "pending_create" ||
-          off.sync_status === "pending_update"
+          !deletedIds.has(off.id) &&
+          (!serverIds.has(off.id) ||
+            off.sync_status === "pending_create" ||
+            off.sync_status === "pending_update")
       )
       .map(
         (off) =>
@@ -90,8 +114,8 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
           }) as Quote
       );
     const localIds = new Set(formattedOffline.map((quote) => quote.id));
-    return [...formattedOffline, ...quotes.filter((quote) => !localIds.has(quote.id))];
-  }, [quotes, offlineQuotes]);
+    return [...formattedOffline, ...quotes.filter((quote) => !localIds.has(quote.id) && !deletedIds.has(quote.id))];
+  }, [quotes, offlineQuotes, deletedIds]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -115,6 +139,43 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
       return matchesStatus && matchesSearch;
     });
   }, [combinedQuotes, statusFilter, searchQuery]);
+
+  const handleDeleteQuote = async () => {
+    if (!deletingQuote) return;
+    setActionError(null);
+    if (navigator.onLine) {
+      const result = await deleteQuoteAction(deletingQuote.id);
+      if (result.error) {
+        setActionError(result.error);
+        return;
+      }
+      setDeletingQuote(undefined);
+      return;
+    }
+
+    const queue = await getSyncQueue();
+    const pendingCreate = queue.find(
+      (item) =>
+        item.action === "CREATE_QUOTE" &&
+        (item.payload.local_quote as OfflineQuote | undefined)?.id === deletingQuote.id
+    );
+    try {
+      if (pendingCreate) {
+        await removeQueuedMutationsForEntity(["CREATE_QUOTE", "UPDATE_QUOTE"], deletingQuote.id);
+      } else {
+        await addToSyncQueue("DELETE_QUOTE", {
+          company_id: companyId,
+          id: deletingQuote.id,
+        });
+      }
+      await deleteOfflineQuote(deletingQuote.id);
+      setDeletedIds((current) => new Set(current).add(deletingQuote.id));
+      setDeletingQuote(undefined);
+    } catch (error) {
+      console.error("Erreur de suppression locale de devis:", error);
+      setActionError("Impossible de supprimer ce devis hors ligne.");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -203,6 +264,15 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
         </div>
       </div>
 
+      {actionError && (
+        <div
+          className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          role="alert"
+        >
+          {actionError}
+        </div>
+      )}
+
       {filteredQuotes.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 py-12 lg:py-16 text-center shadow-sm">
           <FileText size={32} className="text-gray-300 mx-auto mb-3" />
@@ -232,6 +302,9 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
                   <th className="text-right font-semibold text-gray-500 px-5 py-4 uppercase tracking-wider text-xs">
                     Montant
                   </th>
+                  <th className="text-right font-semibold text-gray-500 px-5 py-4 uppercase tracking-wider text-xs">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-150">
@@ -257,12 +330,33 @@ export function QuotesTable({ quotes }: QuotesTableProps) {
                     <td className="px-5 py-4 text-right font-bold text-gray-900 font-mono">
                       {formatCurrency(quote.total)}
                     </td>
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end gap-1">
+                        <button
+                          onClick={() => setDeletingQuote(quote)}
+                          className="p-1.5 min-h-9 min-w-9 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          aria-label="Supprimer"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
+      )}
+
+      {deletingQuote && (
+        <ConfirmDialog
+          open={!!deletingQuote}
+          onOpenChange={(open) => !open && setDeletingQuote(undefined)}
+          title="Supprimer ce devis ?"
+          description={`Le devis "${deletingQuote.quote_number}" sera définitivement supprimé. Cette action est irréversible.`}
+          onConfirm={handleDeleteQuote}
+        />
       )}
     </div>
   );

@@ -173,8 +173,8 @@ export type ReceivableStatus = "pending" | "partial" | "paid" | "overdue" | "can
 export type Receivable = {
   id: string;
   company_id: string;
-  invoice_id: string;
-  client_id: string;
+  invoice_id: string | null;
+  client_id: string | null;
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;

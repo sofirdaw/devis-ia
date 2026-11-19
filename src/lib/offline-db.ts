@@ -14,7 +14,7 @@ import type {
 } from "@/types";
 
 const DB_NAME = "DevisIA_OfflineDB";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 export interface OfflineSnapshot {
   company_id: string;
@@ -110,6 +110,54 @@ export interface OfflineClient {
   sync_status: "synced" | "pending_create" | "pending_update" | "pending_delete";
 }
 
+export interface OfflineReceivable {
+  id: string;
+  company_id?: string;
+  invoice_id?: string;
+  invoice_number?: string;
+  client_id?: string;
+  client_name?: string;
+  total_amount: number;
+  paid_amount: number;
+  remaining_amount: number;
+  due_date?: string;
+  status: "pending" | "partial" | "paid" | "overdue";
+  created_at: string;
+  updated_at?: string;
+  payment_transactions?: Array<{
+    id: string;
+    amount: number;
+    payment_method: string;
+    payment_date: string;
+    reference?: string;
+    notes?: string;
+  }>;
+  sync_status: "synced" | "pending_create" | "pending_update" | "pending_delete";
+}
+
+export interface OfflineCompanySettings {
+  company_id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  rccm?: string;
+  ifu?: string;
+  cme?: string;
+  quote_prefix?: string;
+  invoice_prefix?: string;
+  tax_rate?: number;
+  quote_pdf_template?: "classic" | "modern" | "minimal";
+  invoice_pdf_template?: "classic" | "modern" | "minimal";
+  quote_pdf_use_header?: boolean;
+  invoice_pdf_use_header?: boolean;
+  service_description?: string;
+  default_quote_notes?: string;
+  default_invoice_notes?: string;
+  logo_url?: string;
+  updated_at: string;
+}
+
 export interface SyncQueueItem {
   id: string;
   action:
@@ -131,6 +179,7 @@ export interface SyncQueueItem {
     | "UPDATE_QUOTE_STATUS"
     | "UPDATE_INVOICE_STATUS"
     | "ADD_PAYMENT"
+    | "CREATE_RECEIVABLE"
     | "UPDATE_RECEIVABLE"
     | "DELETE_RECEIVABLE"
     | "DELETE_PAYMENT"
@@ -173,6 +222,15 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains("suppliers")) {
         const supplierStore = db.createObjectStore("suppliers", { keyPath: "id" });
         supplierStore.createIndex("sync_status", "sync_status", { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains("receivables")) {
+        const receivableStore = db.createObjectStore("receivables", { keyPath: "id" });
+        receivableStore.createIndex("sync_status", "sync_status", { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains("company_settings")) {
+        db.createObjectStore("company_settings", { keyPath: "company_id" });
       }
 
       if (!db.objectStoreNames.contains("sync_queue")) {
@@ -463,6 +521,86 @@ export async function deleteOfflineSupplier(id: string): Promise<void> {
   });
 }
 
+// ── CRÉANCES ───────────────────────────────────────────────────────────────────
+
+export async function getOfflineReceivables(): Promise<OfflineReceivable[]> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction("receivables", "readonly");
+      const store = transaction.objectStore("receivables");
+      const request = store.getAll();
+
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.error("Erreur lecture receivables IndexedDB:", err);
+    return [];
+  }
+}
+
+export async function saveOfflineReceivable(receivable: OfflineReceivable): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("receivables", "readwrite");
+    const store = transaction.objectStore("receivables");
+    const request = store.put(receivable);
+
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteOfflineReceivable(id: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("receivables", "readwrite");
+    const store = transaction.objectStore("receivables");
+    const request = store.delete(id);
+
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// ── PARAMÈTRES ENTREPRISE ─────────────────────────────────────────────────────
+
+export async function getOfflineCompanySettings(companyId: string): Promise<OfflineCompanySettings | null> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const request = db.transaction("company_settings", "readonly").objectStore("company_settings").get(companyId);
+      request.onsuccess = () => resolve((request.result as OfflineCompanySettings | undefined) ?? null);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.error("Erreur lecture company_settings IndexedDB:", err);
+    return null;
+  }
+}
+
+export async function saveOfflineCompanySettings(settings: OfflineCompanySettings): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("company_settings", "readwrite");
+    const store = transaction.objectStore("company_settings");
+    const request = store.put(settings);
+
+    request.onsuccess = () => {
+      notifyOfflineDataChanged();
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
 // ── FILE D'ATTENTE DE SYNCHRONISATION ────────────────────────────────────────
 
 export async function addToSyncQueue(
@@ -536,7 +674,7 @@ export async function removeQueuedMutationsForEntity(
 ): Promise<number> {
   const queue = await getSyncQueue();
   const nestedIds = (payload: Record<string, unknown>) =>
-    ["local_client", "local_product", "local_supplier", "local_quote", "local_invoice"]
+    ["local_client", "local_product", "local_supplier", "local_quote", "local_invoice", "local_receivable"]
       .map((key) => (payload[key] as { id?: string } | undefined)?.id)
       .filter((id): id is string => Boolean(id));
   const matches = queue.filter(

@@ -1,4 +1,4 @@
-const CACHE_NAME = "devis-ia-v16";
+const CACHE_NAME = "devis-ia-v17";
 
 const STATIC_ASSETS = [
   "/offline.html",
@@ -11,6 +11,16 @@ const STATIC_ASSETS = [
   "/ocr/tesseract-core-lstm.wasm.js",
   "/ocr/tesseract-core-lstm.wasm",
   "/ocr/fra.traineddata.gz",
+  "/help",
+  "/dashboard",
+  "/settings",
+  "/subscription",
+  "/clients",
+  "/quotes",
+  "/invoices",
+  "/products",
+  "/suppliers",
+  "/receivables",
 ];
 
 function rscCacheKey(request) {
@@ -29,7 +39,7 @@ function rscCacheKey(request) {
     .join("|");
   let hash = 2166136261;
   for (let index = 0; index < routingState.length; index++) {
-    hash ^= routingState.charCodeAt(index);
+    hash ^= routingState.codePointAt(index) ?? 0;
     hash = Math.imul(hash, 16777619);
   }
   requestUrl.searchParams.set("__offline_rsc", (hash >>> 0).toString(16));
@@ -45,7 +55,7 @@ self.addEventListener("install", (event) => {
         STATIC_ASSETS.map(async (url) => {
           try {
             const res = await fetch(url);
-            if (res && res.status === 200) {
+            if (res?.status === 200) {
               await cache.put(url, res);
             } else {
               console.warn("[SW] Impossible de précacher la ressource :", url, res?.status);
@@ -206,7 +216,6 @@ self.addEventListener("fetch", (event) => {
         return networkResponse;
       })()
     );
-    return;
   }
 });
 
@@ -220,35 +229,14 @@ self.addEventListener("fetch", (event) => {
             for (const client of clientList) {
               try {
                 client.postMessage({ type: 'DEVISIA_SYNC' });
-              } catch (e) {
+              } catch {
                 // ignore
               }
             }
 
             // Optionnel: tenter un replay côté SW en lisant la sync_queue
             // pour les environnements qui préfèrent que le SW fasse le travail.
-            try {
-              const req = indexedDB.open('DevisIA_OfflineDB', 5);
-              req.onsuccess = function () {
-                const db = req.result;
-                const tx = db.transaction('sync_queue', 'readonly');
-                const store = tx.objectStore('sync_queue');
-                const getAll = store.getAll();
-                getAll.onsuccess = async function () {
-                  const items = getAll.result || [];
-                  for (const it of items) {
-                    try {
-                      // Si une API REST existe côté serveur, on pourrait faire un fetch ici.
-                      // Ici on préfère laisser le client faire la sync via Server Actions.
-                    } catch (e) {
-                      // ignore
-                    }
-                  }
-                };
-              };
-            } catch (e) {
-              // ignore
-            }
+            // Ici on préfère laisser le client faire la sync via Server Actions.
           } catch (err) {
             console.error('SW sync handler failed', err);
           }

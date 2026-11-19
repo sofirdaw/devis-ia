@@ -12,7 +12,7 @@
     "dev": "next dev --webpack",
     "prebuild": "npm run copy:ocr",
     "build": "next build",
-    "copy:ocr": "node scripts/copy-ocr-assets.mjs",
+    "copy:ocr": "node src/scripts/copy-ocr-assets.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",

@@ -28,7 +28,9 @@ export function buildOfflineDashboardStats(
     now.getFullYear()
   );
   const receivablesByInvoice = new Map(
-    snapshot.receivables.map((receivable) => [receivable.invoice_id, receivable])
+    snapshot.receivables
+      .filter((receivable) => receivable.invoice_id !== null)
+      .map((receivable) => [receivable.invoice_id as string, receivable])
   );
 
   return {
