@@ -275,6 +275,14 @@ L'application peut être déployée sur n'importe quelle plateforme supportant N
 - Render
 - Docker
 
+Sur Netlify, configurez `NEXT_PUBLIC_SUPABASE_URL` et
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` comme variables de build publiques : elles sont
+nécessaires au client Supabase et ne doivent pas être marquées comme secrets.
+Si elles sont déjà marquées comme secrets, définissez dans les variables
+d'environnement du site Netlify (ou de l'équipe) :
+`SECRETS_SCAN_OMIT_KEYS=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+N'ajoutez pas à cette liste les clés privées, mots de passe ou clés de service.
+
 ## 🤝 Contribution
 
 Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou un pull request.
